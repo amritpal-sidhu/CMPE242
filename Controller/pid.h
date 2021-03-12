@@ -1,34 +1,45 @@
 #pragma once
 
 // TODO: set up interrupt to sample sensor
-const unsigned buffer_size = 6;
-float history_buffer[buffer_size] = {0}; // the 0th entry is the current sample
-float kernel[buffer_size] = {0};
+// TODO: copy queue code from 243 and just use that as the history_buffer
+// const unsigned buffer_size = 6;
+// float history_buffer[buffer_size] = {0}; // the 0th entry is the current sample
 
 /**
- * @brief  Construct Kernel based on central difference.
- * @retval None
+ * @brief  Use the centeral difference to compute
+ *         the derivative.
+ * @param  e0: most recent sample
+ * @param  e2: sample from 2 sample periods ago
+ * @retval Value of the derivative.
  */
-void construct_kernel_central(void);
+float derivative_c(float e0, float e2);
 
 /**
- * @brief  Construct Kernel based on forward difference.
- * @retval None
+ * @brief  Use the centeral difference to compute
+ *         the derivative.
+ * @param  e0: most recent sample
+ * @param  e1: sample from 1 sample period ago
+ * @retval Value of the derivative.
  */
-void construct_kernel_forward(void);
+float derivative_f(float e0, float e1);
 
 /**
- * @brief  Construct Kernel based on backward difference.
- * @retval None
+ * @brief  Use the centeral difference to compute
+ *         the derivative.
+ * @param  e1: sample from 1 sample period ago
+ * @param  e2: sample from 2 sample periods ago
+ * @retval Value of the derivative.
  */
-void construct_kernel_backward(void);
+float derivative_b(float e1, float e2);
 
 /**
- * @brief  Construct Kernel based on the Laplacian of Gaussian,
- *         using central difference.
- * @param  std: Standard deviation
- * @retval None
+ * @brief  Use the centeral difference to compute
+ *         the derivative.
+ * @param  e0: most recent sample
+ * @param  e2: sample from 2 sample periods ago
+ * @param  std: standard deviation
+ * @retval Value of the derivative.
  */
-void construct_kernel_LoG(float std);
+float derivative_LoG(float e0, float e2, float std);
 
 // TODO: use the above in convolution
