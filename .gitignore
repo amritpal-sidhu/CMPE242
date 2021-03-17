@@ -7,6 +7,14 @@ __pycache__/
 *.so
 *.o
 
+# Kernel module extensions
+*.ko
+*.cmd
+*.mod
+*.mod.c
+*.order
+*.symvers
+
 # Distribution / packaging
 .Python
 build/
