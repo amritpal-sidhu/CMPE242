@@ -1,6 +1,8 @@
 obj-m = nano_pwm_driver.o
 KVERSION = $(shell uname -r)
 
+# NOTE: nano has kernel-release 4.9.140-tegra as of 2021-03-18
+
 # used when building on Ubuntu host
 # all:
 # 	make ARCH=arm64 -C ~/l4t/Linux_for_Tegra/kernel_build M=$(PWD) modules
