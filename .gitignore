@@ -12,6 +12,7 @@ __pycache__/
 *.cmd
 *.mod
 *.mod.c
+*.o.rc
 *.order
 *.symvers
 

@@ -24,6 +24,8 @@ float derivative_b(float e1, float e2){
  * @note I used the help of the internet to determine
  *       the end result of the LoG is
  *       (x^2 + y^2 - 2*std^2) * exp(-(x^2 +y^2)/2*std^2) / std^4
+ * 
+ * Reference: http://fourier.eng.hmc.edu/e161/lectures/gradient/node8.html
  */
 float derivative_LoG(float e0, float e2, float std) {
 

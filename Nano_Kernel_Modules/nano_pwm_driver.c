@@ -1,0 +1,48 @@
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <asm/io.h>
+
+// Pin 33 on the 40-pin header can be configured for PWM
+// Pin 33 maps to GPIO3_PE.06
+#define GPIO3_BASE                (unsigned long)0x6000d200;
+#define GPIO3_E_CNF_OFFSET        (unsigned long)0x100; // bit 6 should be 1 for GPIO mode
+#define GPIO3_E_OE_OFFSET         (unsigned long)0x110; // bit 6 should be 1 for output enabled
+#define GPIO3_E_OUT_OFFSET        (unsigned long)0x120;
+#define GPIO3_E_IN_OFFSET         (unsigned long)0x130;
+
+#define PWM_CTL_BASE              (unsigned long)0x7000a000;
+
+int CMPE242_nano_init(void) {
+
+	void __iomem *reg_ptr;
+	unsigned reg_val;
+
+	printk(KERN_INFO "Loading CMPE242 kernel module\n");
+
+	reg_ptr = ioremap(GPIO3_BASE+GPIO3_E_CNF_OFFSET, 2);
+	reg_val = readw(reg_ptr);
+
+	// check to see if GPIO3_PE.06 is locked or not
+	if (reg_val & (1U << 14)) {
+		printk(KERN_INFO "GPIO3_PE.06 is locked\n");
+	}
+	else {
+		printk(KERN_INFO "GPIO3_PE.06 is not locked\n");
+	}
+
+	return 0;
+}
+
+void CMPE242_nano_exit(void) {
+
+	printk(KERN_INFO "Removing CMPE242 kernel module\n");
+}
+
+module_init(CMPE242_nano_init);
+module_exit(CMPE242_nano_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Nano PWM driver for CMPE242");
+MODULE_AUTHOR("APS");
+
