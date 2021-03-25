@@ -1,4 +1,4 @@
-CXX = gcc
+CXX = $(CROSS_COMPILE)gcc
 CXXFLAGS = -c -g -Wall -W -Werror -pedantic
 LDFLAGS = -lm
 

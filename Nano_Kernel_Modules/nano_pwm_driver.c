@@ -2,6 +2,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <asm/io.h>
+#include <net/sock.h>
+#include <linux/netlink.h>
+#include <linux/skbuff.h>
 
 // Pin 33 on the 40-pin header can be configured for PWM2
 // Pin 33 maps to GPIO_PE.06
@@ -32,6 +35,9 @@
 #define PWM_PULSE_WIDTH_OFFSET   (unsigned)16
 #define PWM_FREQ_OFFSET          (unsigned)0
 
+/* netlink id */
+#define NETLINK_ID  18
+
 /* functions for configuring PWM */
 static unsigned get_min(unsigned a, unsigned b) { return a < b ? a : b; }
 static unsigned get_max(unsigned a, unsigned b) { return a > b ? a : b; }
@@ -39,8 +45,44 @@ static unsigned round_divide(unsigned dividend, unsigned divisor) {
 	return (dividend + (divisor/2)) / divisor;
 }
 
+/* For kernel space to-from user space comm */
+struct sock *nl_sock = NULL;
 
-void print_PWM_clock_info(void) {
+static void netlink_rx_msg(struct sk_buff *skb) {
+	struct sk_buff *skb_out;
+    struct nlmsghdr *nlh;
+    int msg_size;
+    char *msg;
+    int pid;
+    int res;
+
+    nlh = (struct nlmsghdr *)skb->data;
+    pid = nlh->nlmsg_pid; /* pid of sending process */
+    msg = (char *)nlmsg_data(nlh);
+    msg_size = strlen(msg);
+
+    printk(KERN_INFO "netlink_test: Received from pid %d: %s\n", pid, msg);
+
+    // create reply
+    skb_out = nlmsg_new(msg_size, 0);
+    if (!skb_out) {
+      printk(KERN_ERR "netlink_test: Failed to allocate new skb\n");
+      return;
+    }
+
+    // put received message into reply
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+    NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+    strncpy(nlmsg_data(nlh), msg, msg_size);
+
+    printk(KERN_INFO "netlink_test: Send %s\n", msg);
+
+    res = nlmsg_unicast(nl_sock, skb_out, pid);
+    if (res < 0)
+      printk(KERN_INFO "netlink_test: Error while sending skb to user\n");
+}
+
+static void print_PWM_clock_info(void) {
 
 	void __iomem *reg_ptr;
 	unsigned reg_val;
@@ -55,7 +97,7 @@ void print_PWM_clock_info(void) {
 /**
  *  @brief Configure GPIO PE6 as SPIO for PWM2
  */
-void GPIO_PE6_config(void) {
+static void GPIO_PE6_config(void) {
 
 	void __iomem *reg_ptr;
 	unsigned reg_val;
@@ -78,19 +120,39 @@ void GPIO_PE6_config(void) {
 }
 
 /**
+ * @brief  Helper function to set the PWM clock period.
+ * @param  desired_freq_Hz: The desired frequency in Hertz
+ * @retval The value to be written to the PFM register of the Jetson Nano.
+ */
+static unsigned PWM_set_freq(unsigned desired_freq_Hz) {
+
+	// PWM is set up to use the peripheral pllP_out0 which is fixed at 408MHz
+	// PWM also uses a divisor of 0xf
+	const unsigned pwm_src_clk_freq = 408000000U / ((0xfU/2)+1);
+
+	return get_max(get_min(round_divide(round_divide(pwm_src_clk_freq, 256), desired_freq_Hz)-1, 0x1fff), 0x0);
+}
+
+/**
+ * @brief  Helper function to set the PWM duty cycle.
+ * @param  duty_cycle_fixed: Fixed point representation of the duty
+ *                           cycle with 2 decimal places. (i.e. multiply by 100)
+ * @retval The value to be written to the PWM register of the Jetson Nano.
+ */
+static unsigned PWM_set_duty_cycle(unsigned duty_cycle_fixed) {
+	return get_max(get_min(round_divide(duty_cycle_fixed*256, 10000), 256), 0);
+}
+
+/**
  *
  *  @param desired_freq_Hz: The desired frequency in Hertz
  *  @param duty_cycle_fixed: Fixed point representation of the duty cycle
  *                           with 2 decimal places. (i.e. multiply by 100)
  */
-void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
+static void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
 
 	void __iomem *reg_ptr;
 	unsigned reg_val = 0X00000000;
-	
-	// PWM is set up to use the peripheral pllP_out0 which is fixed at 408MHz
-	// PWM also uses a divisor of 0xf
-	const unsigned pwm_src_clk_freq = 408000000U / ((0xfU/2)+1);
 
 	// EN is 1 bit
 	// PWM is 15 bits
@@ -99,8 +161,8 @@ void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
 	
 	EN = 1U;
 	// dividing by 10000 to convert percent and fixed point value
-	PWM = get_max(get_min(round_divide(duty_cycle_fixed*256, 10000), 256), 0);
-	PFM = get_max(get_min(round_divide(round_divide(pwm_src_clk_freq, 256), desired_freq_Hz)-1, 0x1fff), 0x0);
+	PWM = PWM_set_duty_cycle(duty_cycle_fixed);
+	PFM = PWM_set_freq(desired_freq_Hz);
 	
 	reg_val = (EN << PWM_EN_BIT_OFFSET) | (PWM << PWM_PULSE_WIDTH_OFFSET) | (PFM << PWM_FREQ_OFFSET);
 	
@@ -109,10 +171,41 @@ void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
 	iounmap(reg_ptr);
 }
 
-void module_deinit(void) {
+/**
+ * @note On the NEMA 17 stepper motor
+ * 
+ *   Step angle = 1.8 degrees
+ * 
+ */
+
+int nano_pwm_driver_init(void) {
+
+	printk(KERN_INFO "Loading CMPE242 nano pwm kernel module\n");
+
+	// GPIO_PE6_config();
+	// PWM2_init(75, 5000); // duty cycle needs to be multipled by 100 for fixed point
+
+	stuct netlink_kernel_cfg nl_cfg = {
+		.input = netlink_rx_msg
+	};
+	
+	nl_sock = netlink_kernel_create(&init_net, NETLINK_ID, &cfg);
+	if (!nl_sock) {
+		printk(KERN_INFO "Failed to create netlink from nano_pwm_driver\n");
+		return -1;
+	}
+
+
+
+	return 0;
+}
+
+void nano_pwm_driver_exit(void) {
 
 	void __iomem *reg_ptr;
 	unsigned reg_val;
+
+	printk(KERN_INFO "Clearing PWM2 registers and setting PE6 to default\n");	
 	
 	reg_val = 0x00000000;
 	reg_ptr = ioremap(PWM_CSR2_BASE, 4);
@@ -133,22 +226,10 @@ void module_deinit(void) {
 	reg_val |= (1U << PIN_6_OFFSET);
 	iowrite16(reg_val, reg_ptr);
 	iounmap(reg_ptr);
-}
 
-int nano_pwm_driver_init(void) {
-
-	printk(KERN_INFO "Loading CMPE242 nano pwm kernel module\n");
-
-	GPIO_PE6_config();
-	PWM2_init(75, 5000); // duty cycle needs to be multipled by 100 for fixed point
-
-	return 0;
-}
-
-void nano_pwm_driver_exit(void) {
+	netlink_kernel_release(nl_sock);
 
 	printk(KERN_INFO "Removing CMPE242 nano pwm kernel module\n");
-	module_deinit();
 }
 
 module_init(nano_pwm_driver_init);
