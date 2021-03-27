@@ -14,10 +14,16 @@
 #define PE_OE_OFFSET             (unsigned long)0x110
 #define PE_OUT_OFFSET            (unsigned long)0x120
 #define PIN_6_OFFSET             (unsigned)6
+// Pin 31 GPIO_PZ.00 is for controlling stepper direction
+#define PZ_CNF_OFFSET            (unsigned long)0x604
+#define PZ_OE_OFFSET             (unsigned long)0x614
+#define PZ_OUT_OFFSET            (unsigned long)0x624
+#define PIN_0_OFFSET             (unsigned)0
 
 /* Pinmux configuration and control addresses and offsets for PE6 */
 #define PINMUX_AUX_BASE          (unsigned long)0x70000000
 #define PINMUX_PE6_OFFSET        (unsigned long)0x3248 // see page 368 of Tegra X1 manual
+#define PINMUX_PZ0_OFFSET        (unsigned long)0x327c
 #define INPUT_BIT_OFFSET         (unsigned)6
 #define TRISTATE_BIT_OFFSET      (unsigned)4
 #define PUPD_BITS_OFFSET         (unsigned)2
@@ -39,6 +45,17 @@
 #define NETLINK_ID  18
 
 
+enum pwm_state_e {
+    PWM_ENABLE,
+    PWM_DISABLE
+};
+
+enum {
+    FREQ,
+    DUTY,
+    DIR
+} msg_type, last_msg_type;
+
 
 /* For kernel space to-from user space comm */
 static struct sock *nl_sock = NULL;
@@ -48,9 +65,10 @@ static struct sock *nl_sock = NULL;
  * this module's scope.
  *
  * Default values are also assigned.
+ * Note: 20Hz seems to be the minimum frequency
  */
-static unsigned duty_cycle_percent = 0;
-static unsigned pwm_freq_Hz = 0;
+static unsigned pwm_freq_Hz = 20;
+static unsigned duty_cycle_percent = 50;
 
 /* functions for configuring PWM */
 static unsigned get_min(unsigned a, unsigned b) { return a < b ? a : b; }
@@ -62,10 +80,8 @@ static unsigned round_divide(unsigned dividend, unsigned divisor) {
 static void netlink_rx_msg(struct sk_buff *skb);
 
 static void print_PWM_clock_info(void);
-static void GPIO_PE6_config(void);
-static unsigned PWM_convert_freq(unsigned desired_freq_Hz);
-static unsigned PWM_convert_duty_cycle(unsigned duty_cycle_fixed);
-static void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed);
+static void GPIO_init(void);
+static void PWM2_config(enum pwm_state_e state, unsigned desired_freq_Hz, unsigned duty_cycle_fixed);
 
 
 /**
@@ -81,14 +97,17 @@ int nano_pwm_driver_init(void) {
 
 	printk(KERN_INFO "nano_pwm_driver: Loading CMPE242 nano pwm kernel module\n");
 
-	GPIO_PE6_config();
-	PWM2_init(duty_cycle_percent, pwm_freq_Hz);
-
+	GPIO_init();
+	
+	// start up state
+	msg_type = FREQ;
+	last_msg_type = DIR;
+	
 	nl_cfg.input = netlink_rx_msg;
 	
 	nl_sock = netlink_kernel_create(&init_net, NETLINK_ID, &nl_cfg);
 	if (!nl_sock) {
-		printk(KERN_INFO "nano_pwm_driver: Failed to create netlink from nano_pwm_driver\n");
+		printk(KERN_ALERT "nano_pwm_driver: Failed to create netlink from nano_pwm_driver\n");
 		return -1;
 	}
 
@@ -135,6 +154,9 @@ static void netlink_rx_msg(struct sk_buff *skb) {
     char *msg;
     int pid;
     int res;
+    
+    void __iomem *reg_ptr;
+	unsigned reg_val;
 
     nlh = (struct nlmsghdr *)skb->data;
     pid = nlh->nlmsg_pid; /* pid of sending process */
@@ -142,6 +164,55 @@ static void netlink_rx_msg(struct sk_buff *skb) {
     msg_size = strlen(msg);
 
     printk(KERN_INFO "nano_pwm_driver: Netlink received from pid %d: %s\n", pid, msg);
+
+	if (!strcmp(msg, "sync")) {
+		msg_type = FREQ;
+		last_msg_type = DIR;
+	}
+	else {
+		// Update PWM state machine
+    	if (msg_type == FREQ && last_msg_type == DIR) {
+    		if (kstrtouint(msg, 10, &pwm_freq_Hz)) {
+    			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
+    		}
+    		printk(KERN_INFO "nano_pwm_driver: Set local global pwm_freq_Hz = %u\n", pwm_freq_Hz);
+    		msg_type = DUTY;
+    		last_msg_type = FREQ;
+    	}
+    	else if (msg_type == DUTY && last_msg_type == FREQ) {
+    		if (kstrtouint(msg, 10, &duty_cycle_percent)) {
+    			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
+    		}
+    		printk(KERN_INFO "nano_pwm_driver: Set local global duty_cycle_percent = %u\n", duty_cycle_percent);
+    		msg_type = DIR;
+    		last_msg_type = DUTY;
+    	}
+    	else if (msg_type == DIR && last_msg_type == DUTY) {
+    		reg_ptr = ioremap(GPIO_BASE+PZ_OUT_OFFSET, 1);
+    		reg_val = ioread8(reg_ptr);
+    		if (!strcmp(msg, "CCW")) {
+    			reg_val |= (1U << PIN_0_OFFSET);
+    		}
+    		else {
+    			reg_val &= ~(1U << PIN_0_OFFSET);
+    		}
+    		iowrite8(reg_val, reg_ptr);
+    		iounmap(reg_ptr);
+    		printk(KERN_INFO "nano_pwm_driver: Updated pin 31's value\n");
+    		if (pwm_freq_Hz < 20) {
+    			PWM2_config(PWM_DISABLE, pwm_freq_Hz, duty_cycle_percent);
+    		}
+    		else {
+    			PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+    		}
+    		printk(KERN_INFO "nano_pwm_driver: Updated PWM register values\n");
+    		msg_type = FREQ;
+    		last_msg_type = DIR;
+    	}
+    	else {
+    		printk(KERN_ALERT "nano_pwm_driver: Message type enums incorrect\n");
+    	}
+	}
 
     // create reply
     skb_out = nlmsg_new(msg_size, 0);
@@ -177,7 +248,7 @@ static void print_PWM_clock_info(void) {
 /**
  *  @brief Configure GPIO PE6 as SPIO for PWM2
  */
-static void GPIO_PE6_config(void) {
+static void GPIO_init(void) {
 
 	void __iomem *reg_ptr;
 	unsigned reg_val;
@@ -192,57 +263,63 @@ static void GPIO_PE6_config(void) {
 	// configure PINMUX PE6 for PWM2
 	reg_ptr = ioremap(PINMUX_AUX_BASE+PINMUX_PE6_OFFSET, 2);
 	reg_val = ioread16(reg_ptr);
-	printk(KERN_INFO "nano_pwm_driver: PE6 pinmux = %x\n", reg_val);
 	reg_val &= ~((1U << INPUT_BIT_OFFSET) | (1U << TRISTATE_BIT_OFFSET) | (3U << PUPD_BITS_OFFSET) | (3U << PM_BITS_OFFSET));
 	reg_val |= (2U << PM_BITS_OFFSET);
+	iowrite16(reg_val, reg_ptr);
+	iounmap(reg_ptr);
+	
+	// configure GPIO PZ.00
+	reg_ptr = ioremap(GPIO_BASE+PZ_CNF_OFFSET, 2);
+	reg_val = ioread16(reg_ptr);
+	reg_val |= (1U << PIN_0_OFFSET);
+	iowrite16(reg_val, reg_ptr);
+	iounmap(reg_ptr);
+	
+	reg_ptr = ioremap(GPIO_BASE+PZ_OE_OFFSET, 1);
+	reg_val = ioread8(reg_ptr);
+	reg_val |= (1U << PIN_0_OFFSET);
+	iowrite8(reg_val, reg_ptr);
+	iounmap(reg_ptr);
+	
+	reg_ptr = ioremap(PINMUX_AUX_BASE+PINMUX_PZ0_OFFSET, 2);
+	reg_val = ioread16(reg_ptr);
+	reg_val &= ~((1U << INPUT_BIT_OFFSET) | (1U << TRISTATE_BIT_OFFSET) | (3U << PUPD_BITS_OFFSET));
 	iowrite16(reg_val, reg_ptr);
 	iounmap(reg_ptr);
 }
 
 /**
- * @brief  Helper function to set the PWM clock period.
- * @param  desired_freq_Hz: The desired frequency in Hertz
- * @retval The value to be written to the PFM register of the Jetson Nano.
+ *  @param state: 1 PWM enable, 0 PWM disable
+ *  @param desired_freq_Hz: The desired frequency in Hertz
+ *  @param duty_cycle_fixed: Fixed point representation of the duty cycle
+ *                           with 2 decimal places. (i.e. multiply by 100)
  */
-static unsigned PWM_convert_freq(unsigned desired_freq_Hz) {
+static void PWM2_config(enum pwm_state_e state, unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
 
 	// PWM is set up to use the peripheral pllP_out0 which is fixed at 408MHz
 	// PWM also uses a divisor of 0xf
 	const unsigned pwm_src_clk_freq = 408000000U / ((0xfU/2)+1);
 
-	return get_max(get_min(round_divide(round_divide(pwm_src_clk_freq, 256), desired_freq_Hz)-1, 0x1fff), 0x0);
-}
-
-/**
- * @brief  Helper function to set the PWM duty cycle.
- * @param  duty_cycle_fixed: Fixed point representation of the duty
- *                           cycle with 2 decimal places. (i.e. multiply by 100)
- * @retval The value to be written to the PWM register of the Jetson Nano.
- */
-static unsigned PWM_convert_duty_cycle(unsigned duty_cycle_fixed) {
-	return get_max(get_min(round_divide(duty_cycle_fixed*256, 10000), 256), 0);
-}
-
-/**
- *
- *  @param desired_freq_Hz: The desired frequency in Hertz
- *  @param duty_cycle_fixed: Fixed point representation of the duty cycle
- *                           with 2 decimal places. (i.e. multiply by 100)
- */
-static void PWM2_init(unsigned desired_freq_Hz, unsigned duty_cycle_fixed) {
-
 	void __iomem *reg_ptr;
 	unsigned reg_val = 0X00000000;
-
+	
 	// EN is 1 bit
 	// PWM is 15 bits
 	// PFM is 13 bits
 	unsigned EN, PWM, PFM;
+
+
+	if (state == PWM_DISABLE) {
+		reg_ptr = ioremap(PWM_CSR2_BASE, 4);
+		iowrite32(reg_val, reg_ptr);
+		iounmap(reg_ptr);
+		return;
+	}
 	
 	EN = 1U;
 	// dividing by 10000 to convert percent and fixed point value
-	PWM = PWM_convert_duty_cycle(duty_cycle_fixed);
-	PFM = PWM_convert_freq(desired_freq_Hz);
+	PWM = get_max(get_min(round_divide(duty_cycle_fixed*256, 10000), 256), 0);
+	PFM = get_max(get_min(round_divide(round_divide(pwm_src_clk_freq, 256), desired_freq_Hz)-1, 0x1fff), 0x0);
 	
 	reg_val = (EN << PWM_EN_BIT_OFFSET) | (PWM << PWM_PULSE_WIDTH_OFFSET) | (PFM << PWM_FREQ_OFFSET);
 	

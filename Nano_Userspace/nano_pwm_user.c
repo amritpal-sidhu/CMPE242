@@ -10,22 +10,105 @@
 #define MAX_PAYLOAD 32  /* maximum payload size */
 #define NETLINK_ID 18
 
-void comm_handler(int sock_fd, struct nlmsghdr *nlh, char *payload);
+void comm_handler(char *payload);
 
 
 int main()
 {
-    struct sockaddr_nl src_addr;
-    struct nlmsghdr *nlh;
-    int sock_fd;
-    char input_string[MAX_PAYLOAD];
+	/* Note: Datasheet says max frequency is 50kHz, but I'm using 10000 temporarily */
+	const int max_freq = 10000;
+    char str_buf[MAX_PAYLOAD];
+    char *str_ptr;
     int temp_num;
-  
-    /* Create netlink socket */
-    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_ID);
+    
+    comm_handler("sync");
+
+	printf("Enter 'q' to quit program.\n");
+	
+	for (;;) {
+	
+		do {
+		
+			
+			printf("Enter your desired PWM frequency in the range [0, %u]: ", max_freq);
+			fgets(str_buf, MAX_PAYLOAD, stdin);
+			// drop newline char
+			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
+				*str_ptr = '\0';
+			}
+			if (!strcmp(str_buf, "q")) {
+			    return 0;
+			}
+			temp_num = atoi(str_buf);
+		
+		} while (temp_num < 0 || temp_num > max_freq);
+		
+		sprintf(str_buf, "%u", temp_num);
+		comm_handler(str_buf);
+	
+		do {
+
+			printf("Enter your desired duty cycle percent in the range [0.00, 100.00]: ");
+			fgets(str_buf, MAX_PAYLOAD, stdin);
+			// drop newline char
+			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
+				*str_ptr = '\0';
+			}
+			if (!strcmp(str_buf, "q")) {
+			    return 0;
+			}
+			sprintf(str_buf, "%s", str_buf); // drop newline char
+			/* I'm using 2 decimal points in fixed point format */
+			temp_num = (int)(atof(str_buf)*100);
+		
+		} while (temp_num < 0 || temp_num > 10000);
+		
+		sprintf(str_buf, "%u", temp_num);
+		comm_handler(str_buf);
+		
+		do {
+		
+			printf("Enter your desired direction (CW or CCW): ");
+			fgets(str_buf, MAX_PAYLOAD, stdin);
+			// drop newline char
+			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
+				*str_ptr = '\0';
+			}
+			if (!strcmp(str_buf, "q")) {
+			    return 0;
+			}
+		
+		} while (strcmp(str_buf, "CW") && strcmp(str_buf, "CCW"));
+		
+		comm_handler(str_buf);
+	}
+}
+
+
+
+/**
+ * @brief  Wrapper for transmitting/receiving between
+ *         userspace and kernel space.
+ * @param  sock_fd: File descriptor of the socket.
+ * @param  nlh: Pointer to netlink message handler.
+ * @param  payload: C string to send to Kernel space.
+ * @retval None
+ */
+void comm_handler(char *payload) {
+
+	struct sockaddr_nl src_addr;
+	struct sockaddr_nl dest_addr;
+    struct nlmsghdr *nlh;
+	struct iovec iov;
+	struct msghdr msg;
+	int sock_fd;
+	int rc;
+	
+	/* Create netlink socket */
+    sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ID);
     if (sock_fd < 0) {
         printf("socket: %s\n", strerror(errno));
-        return sock_fd;
+        exit(sock_fd);
     }
 
 	/* set family as netlink and bind socket for userspace */
@@ -42,76 +125,6 @@ int main()
     nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
     nlh->nlmsg_pid = getpid();  /* self pid */
     nlh->nlmsg_flags = 0;
-
-	printf("Enter 'q' to quit program.\n");
-	
-	for (;;) {
-	
-		do {
-
-			printf("Enter your desired duty cycle percent in the range [0.00:100.00]: ");
-			fgets(input_string, MAX_PAYLOAD, stdin);
-			if (!strcmp(input_string, "q"))
-			    break;
-			/* I'm using 2 decimal points in fixed point format */
-			temp_num = (int)(atof(input_string)*100);
-		
-		} while (temp_num < 0 || temp_num > 10000);
-		
-		if (sprintf(input_string, "%ui", temp_num)) {
-		    printf("String to int conversion failed for %ui\n", temp_num);
-		    close(sock_fd);
-        	exit(1);
-		}
-		comm_handler(sock_fd, nlh, input_string);
-		
-		do {
-		
-			/* Note: Datasheet says max frequency is 50kHz, but I'm using 1000 temporarily */
-			printf("Enter your desired PWM frequency in the range [0:1000]: ");
-			fgets(input_string, MAX_PAYLOAD, stdin);
-			if (!strcmp(input_string, "q"))
-			    break;
-			temp_num = atoi(input_string);
-		
-		} while (temp_num < 0 || temp_num > 1000);
-		
-		comm_handler(sock_fd, nlh, input_string);
-		
-		do {
-		
-			printf("Enter your desired direction (CW or CCW): ");
-			fgets(input_string, MAX_PAYLOAD, stdin);
-			if (!strcmp(input_string, "q"))
-			    break;
-		
-		} while (strcmp(input_string, "CW") || strcmp(input_string, "CCW"));
-		
-		comm_handler(sock_fd, nlh, input_string);
-	}
-
-    /* Close Netlink Socket */
-    close(sock_fd);
-
-    return 0;
-}
-
-
-
-/**
- * @brief  Wrapper for transmitting/receiving between
- *         userspace and kernel space.
- * @param  sock_fd: File descriptor of the socket.
- * @param  nlh: Pointer to netlink message handler.
- * @param  payload: C string to send to Kernel space.
- * @retval None
- */
-void comm_handler(int sock_fd, struct nlmsghdr *nlh, char *payload) {
-
-	struct sockaddr_nl dest_addr;
-	struct iovec iov;
-	struct msghdr msg;
-	int rc;
 	
 	/* create kernel sockaddr_nl object */
     memset(&dest_addr, 0, sizeof(dest_addr));
@@ -156,5 +169,7 @@ void comm_handler(int sock_fd, struct nlmsghdr *nlh, char *payload) {
     }
 
     printf("Received from kernel: %s\n", (char *)NLMSG_DATA(nlh));
+    
+    close(sock_fd);
 }
 
