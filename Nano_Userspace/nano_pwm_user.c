@@ -99,7 +99,7 @@ int main() {
 
 		if (strlen(temp_dir) > 1) {
 			netlink_send_string("dir");
-			netlink_send_string(str_buf);
+			netlink_send_string(temp_dir);
 			++something_sent;
 		}
 
@@ -139,6 +139,7 @@ int parse_number(char *str_start_ptr, int is_float) {
 
 			sub_str_size = strlen(str_start_ptr) - strlen(str_ptr);
 			strncpy(result_string, str_start_ptr, sub_str_size);
+			result_string[sub_str_size] = '\0'; // strncpy() doesn't do this for you.
 			if (is_float) {
 				retval = (int)(atof(result_string)*100);
 			}
@@ -175,6 +176,7 @@ void parse_sub_string(char *str_start_ptr, char *result_str) {
 
 			sub_str_size = strlen(str_start_ptr) - strlen(str_ptr);
 			strncpy(result_str, str_start_ptr, sub_str_size);
+			result_str[sub_str_size] = '\0'; // strncpy() doesn't do this for you.
 	}
 }
 

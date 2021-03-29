@@ -319,13 +319,24 @@ static void update_message_state_machine(char *msg) {
 		if (kstrtouint(msg, 10, &pwm_freq_Hz)) {
 			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
 		}
-		PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+		if (pwm_freq_Hz > 20) {
+		    PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+		}
+		else {
+		    PWM2_config(PWM_DISABLE, pwm_freq_Hz, duty_cycle_percent);
+		}
 		printk(KERN_INFO "nano_pwm_driver: Set PWM2 frequency to = %u\n", pwm_freq_Hz);
 		msg_type = CMD_STRING;
 	}
 	else if (msg_type == DUT) {
 		if (kstrtouint(msg, 10, &duty_cycle_percent)) {
 			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
+		}
+		if (pwm_freq_Hz > 20) {
+		    PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+		}
+		else {
+		    PWM2_config(PWM_DISABLE, pwm_freq_Hz, duty_cycle_percent);
 		}
 		PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
 		printk(KERN_INFO "nano_pwm_driver: Set PWM2 duty cycle to = %u\n", duty_cycle_percent);
