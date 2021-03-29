@@ -51,10 +51,11 @@ enum pwm_state_e {
 };
 
 enum {
-    FREQ,
-    DUTY,
-    DIR
-} msg_type, last_msg_type;
+	FRQ,
+	DUT,
+	DIR,
+	CMD_STRING
+} msg_type;
 
 
 /* For kernel space to-from user space comm */
@@ -83,12 +84,17 @@ static void print_PWM_clock_info(void);
 static void GPIO_init(void);
 static void PWM2_config(enum pwm_state_e state, unsigned desired_freq_Hz, unsigned duty_cycle_fixed);
 
+static void update_message_state_machine(char *msg);
+
 
 /**
  * @note On the NEMA 17 stepper motor
- * 
- *   Step angle = 1.8 degrees
- * 
+ *       
+ *    Step angle = 1.8 degrees
+ *    Thus, 200 steps in a revolution
+ *    To convert to RPM one could do the following:
+ *    RPM = freq(steps/sec) * 60(sec/min) * (1/200)(rev/step)
+ *    RPM = 0.3 * freq
  */
 
 int nano_pwm_driver_init(void) {
@@ -98,10 +104,10 @@ int nano_pwm_driver_init(void) {
 	printk(KERN_INFO "nano_pwm_driver: Loading CMPE242 nano pwm kernel module\n");
 
 	GPIO_init();
+	PWM2_config(PWM_DISABLE, pwm_freq_Hz, duty_cycle_percent);
 	
 	// start up state
-	msg_type = FREQ;
-	last_msg_type = DIR;
+	msg_type = CMD_STRING;
 	
 	nl_cfg.input = netlink_rx_msg;
 	
@@ -154,9 +160,6 @@ static void netlink_rx_msg(struct sk_buff *skb) {
     char *msg;
     int pid;
     int res;
-    
-    void __iomem *reg_ptr;
-	unsigned reg_val;
 
     nlh = (struct nlmsghdr *)skb->data;
     pid = nlh->nlmsg_pid; /* pid of sending process */
@@ -165,54 +168,7 @@ static void netlink_rx_msg(struct sk_buff *skb) {
 
     printk(KERN_INFO "nano_pwm_driver: Netlink received from pid %d: %s\n", pid, msg);
 
-	if (!strcmp(msg, "sync")) {
-		msg_type = FREQ;
-		last_msg_type = DIR;
-	}
-	else {
-		// Update PWM state machine
-    	if (msg_type == FREQ && last_msg_type == DIR) {
-    		if (kstrtouint(msg, 10, &pwm_freq_Hz)) {
-    			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
-    		}
-    		printk(KERN_INFO "nano_pwm_driver: Set local global pwm_freq_Hz = %u\n", pwm_freq_Hz);
-    		msg_type = DUTY;
-    		last_msg_type = FREQ;
-    	}
-    	else if (msg_type == DUTY && last_msg_type == FREQ) {
-    		if (kstrtouint(msg, 10, &duty_cycle_percent)) {
-    			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
-    		}
-    		printk(KERN_INFO "nano_pwm_driver: Set local global duty_cycle_percent = %u\n", duty_cycle_percent);
-    		msg_type = DIR;
-    		last_msg_type = DUTY;
-    	}
-    	else if (msg_type == DIR && last_msg_type == DUTY) {
-    		reg_ptr = ioremap(GPIO_BASE+PZ_OUT_OFFSET, 1);
-    		reg_val = ioread8(reg_ptr);
-    		if (!strcmp(msg, "CCW")) {
-    			reg_val |= (1U << PIN_0_OFFSET);
-    		}
-    		else {
-    			reg_val &= ~(1U << PIN_0_OFFSET);
-    		}
-    		iowrite8(reg_val, reg_ptr);
-    		iounmap(reg_ptr);
-    		printk(KERN_INFO "nano_pwm_driver: Updated pin 31's value\n");
-    		if (pwm_freq_Hz < 20) {
-    			PWM2_config(PWM_DISABLE, pwm_freq_Hz, duty_cycle_percent);
-    		}
-    		else {
-    			PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
-    		}
-    		printk(KERN_INFO "nano_pwm_driver: Updated PWM register values\n");
-    		msg_type = FREQ;
-    		last_msg_type = DIR;
-    	}
-    	else {
-    		printk(KERN_ALERT "nano_pwm_driver: Message type enums incorrect\n");
-    	}
-	}
+	update_message_state_machine(msg);
 
     // create reply
     skb_out = nlmsg_new(msg_size, 0);
@@ -286,6 +242,13 @@ static void GPIO_init(void) {
 	reg_val &= ~((1U << INPUT_BIT_OFFSET) | (1U << TRISTATE_BIT_OFFSET) | (3U << PUPD_BITS_OFFSET));
 	iowrite16(reg_val, reg_ptr);
 	iounmap(reg_ptr);
+
+	// configure stepper to move CCW by default
+	reg_ptr = ioremap(GPIO_BASE+PZ_OUT_OFFSET, 1);
+	reg_val = ioread8(reg_ptr);
+	reg_val |= (1U << PIN_0_OFFSET);
+	iowrite8(reg_val, reg_ptr);
+	iounmap(reg_ptr);
 }
 
 /**
@@ -328,7 +291,64 @@ static void PWM2_config(enum pwm_state_e state, unsigned desired_freq_Hz, unsign
 	iounmap(reg_ptr);
 }
 
+static void update_message_state_machine(char *msg) {
 
+	void __iomem *reg_ptr;
+	unsigned reg_val;
+
+	if (!strcmp(msg, "sync")) {
+		msg_type = CMD_STRING;
+		return;
+	}
+	
+	if (msg_type == CMD_STRING) {
+		if (!strcmp(msg, "frq")) {
+			msg_type = FRQ;
+		}
+		else if (!strcmp(msg, "dut")) {
+			msg_type = DUT;
+		}
+		else if (!strcmp(msg, "dir")) {
+			msg_type = DIR;
+		}
+		else {
+			printk(KERN_ALERT "nano_pwm_driver: Unexpected message string when msg_type = CMD_STRING\n");
+		}
+	}
+	else if (msg_type == FRQ) {
+		if (kstrtouint(msg, 10, &pwm_freq_Hz)) {
+			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
+		}
+		PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+		printk(KERN_INFO "nano_pwm_driver: Set PWM2 frequency to = %u\n", pwm_freq_Hz);
+		msg_type = CMD_STRING;
+	}
+	else if (msg_type == DUT) {
+		if (kstrtouint(msg, 10, &duty_cycle_percent)) {
+			printk(KERN_ALERT "nano_pwm_dirver: kstrtouint() failed\n");
+		}
+		PWM2_config(PWM_ENABLE, pwm_freq_Hz, duty_cycle_percent);
+		printk(KERN_INFO "nano_pwm_driver: Set PWM2 duty cycle to = %u\n", duty_cycle_percent);
+		msg_type = CMD_STRING;
+	}
+	else if (msg_type == DIR) {
+		reg_ptr = ioremap(GPIO_BASE+PZ_OUT_OFFSET, 1);
+		reg_val = ioread8(reg_ptr);
+		if (!strcmp(msg, "CCW")) {
+			reg_val |= (1U << PIN_0_OFFSET);
+		}
+		else {
+			reg_val &= ~(1U << PIN_0_OFFSET);
+		}
+		iowrite8(reg_val, reg_ptr);
+		iounmap(reg_ptr);
+		printk(KERN_INFO "nano_pwm_driver: Set GPIO_PZ.00 so stepper rotates %s\n", msg);
+		msg_type = CMD_STRING;
+	}
+	else {
+		printk(KERN_ALERT "nano_pwm_driver: msg_type enum incorrect\n");
+	}
+}
 
 module_init(nano_pwm_driver_init);
 module_exit(nano_pwm_driver_exit);

@@ -7,84 +7,176 @@
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
-#define MAX_PAYLOAD 32  /* maximum payload size */
+#define MAX_STRING_SIZE 48
 #define NETLINK_ID 18
 
-void comm_handler(char *payload);
+// parsing wrappers
+int parse_number(char *str_start_ptr, int is_float);
+void parse_sub_string(char *str_start_ptr, char *result_str);
+
+// netlink wrapper
+void netlink_send_string(char *payload);
 
 
-int main()
-{
+int main() {
+
 	/* Note: Datasheet says max frequency is 50kHz, but I'm using 10000 temporarily */
 	const int max_freq = 10000;
-    char str_buf[MAX_PAYLOAD];
+    char str_buf[MAX_STRING_SIZE];
     char *str_ptr;
-    int temp_num;
+    int temp_frq, temp_dut, something_sent;
+	char temp_dir[16];
     
-    comm_handler("sync");
-
-	printf("Enter 'q' to quit program.\n");
+	netlink_send_string("sync");
 	
+	printf("Enter your message in the following format: \"FRQ=x, DUT=y, DIR=z\"\n");
+	printf("FRQ is your desired PWM frequency in the range [0, %u]\n", max_freq);
+	printf("DUT is your desired duty cycle percent in the range [0.00, 100.00]\n");
+	printf("DIR is your desired direction (CW or CCW)\n");
+	printf("You may omit values you do not wish to change, and parameter names are not case sensitive\n");
+	printf("Enter 'q' to quit program.\n");
+
 	for (;;) {
 	
-		do {
-		
-			
-			printf("Enter your desired PWM frequency in the range [0, %u]: ", max_freq);
-			fgets(str_buf, MAX_PAYLOAD, stdin);
-			// drop newline char
-			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
-				*str_ptr = '\0';
-			}
-			if (!strcmp(str_buf, "q")) {
-			    return 0;
-			}
-			temp_num = atoi(str_buf);
-		
-		} while (temp_num < 0 || temp_num > max_freq);
-		
-		sprintf(str_buf, "%u", temp_num);
-		comm_handler(str_buf);
-	
-		do {
+		printf("Enter your command: ");
+		fgets(str_buf, MAX_STRING_SIZE, stdin);
+		if (!strcmp(str_buf, "q\n")) {
+			break;
+		}
 
-			printf("Enter your desired duty cycle percent in the range [0.00, 100.00]: ");
-			fgets(str_buf, MAX_PAYLOAD, stdin);
-			// drop newline char
-			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
-				*str_ptr = '\0';
+		temp_frq = -1;
+		temp_dut = -1;
+		strcpy(temp_dir, "");
+		something_sent = 0;
+		/**
+		 * I check for each field, ignore other fields
+		 * 
+		 * Not the best solution since it requires multiple searching over already searched string.
+		 * Could keep a history of searched string like KMP & Aho-Corasick, but too lazy to implement that right now.
+		 * These strings are so short, improvment is negligible.
+		 */
+		if ((str_ptr=strstr(str_buf, "FRQ")) || (str_ptr=strstr(str_buf, "frq"))) {
+			
+			temp_frq = parse_number(str_ptr, 0);
+			if (temp_frq < 0 || temp_frq > max_freq) {
+				printf("Parsed frequency value out of range\n");
+				continue;
 			}
-			if (!strcmp(str_buf, "q")) {
-			    return 0;
+		}
+
+		if ((str_ptr=strstr(str_buf, "DUT")) || (str_ptr=strstr(str_buf, "dut"))) {
+			
+			temp_dut = parse_number(str_ptr, 1);
+			if (temp_dut < 0 || temp_dut > 10000) {
+				printf("Parsed duty cycle value out of range\n");
+				continue;
 			}
-			sprintf(str_buf, "%s", str_buf); // drop newline char
-			/* I'm using 2 decimal points in fixed point format */
-			temp_num = (int)(atof(str_buf)*100);
-		
-		} while (temp_num < 0 || temp_num > 10000);
-		
-		sprintf(str_buf, "%u", temp_num);
-		comm_handler(str_buf);
-		
-		do {
-		
-			printf("Enter your desired direction (CW or CCW): ");
-			fgets(str_buf, MAX_PAYLOAD, stdin);
-			// drop newline char
-			if ((str_ptr=strchr(str_buf, '\n')) != NULL) {
-				*str_ptr = '\0';
+		}
+
+		if ((str_ptr=strstr(str_buf, "DIR")) || (str_ptr=strstr(str_buf, "dir"))) {
+			
+			parse_sub_string(str_ptr, temp_dir);
+			if (strcmp(temp_dir, "CW") && strcmp(temp_dir, "CCW")) {
+				printf("Parsed direction string is invalid\n");
+				continue;
 			}
-			if (!strcmp(str_buf, "q")) {
-			    return 0;
-			}
-		
-		} while (strcmp(str_buf, "CW") && strcmp(str_buf, "CCW"));
-		
-		comm_handler(str_buf);
+		}
+
+		// send payloads if available
+		if (temp_frq > 0) {
+			netlink_send_string("frq");
+			sprintf(str_buf, "%i", temp_frq);
+			netlink_send_string(str_buf);
+			++something_sent;
+		}
+
+		if (temp_dut > 0) {
+			netlink_send_string("dut");
+			sprintf(str_buf, "%i", temp_dut);
+			netlink_send_string(str_buf);
+			++something_sent;
+		}
+
+		if (strlen(temp_dir) > 1) {
+			netlink_send_string("dir");
+			netlink_send_string(str_buf);
+			++something_sent;
+		}
+
+		if (!something_sent) {
+			printf("Input string did not contain valid fields\n");
+		}
 	}
 }
 
 
+
+/**
+ * @brief  Simple string parsing wrapper to take care of
+ *         extracting number value once start of 'frq' or
+ *         'dut' field is found.
+ * @param  str_start_ptr: Start of 'frq' or 'dut' field,
+ *                        Including the field name.
+ * @param  is_float: 0 if parsing 'frq', 1 if parsing 'dut'
+ * @retval Parsed integer value
+ */
+int parse_number(char *str_start_ptr, int is_float) {
+
+	int retval = -1;
+	size_t sub_str_size;
+	char *str_ptr;
+	char result_string[16];
+
+	// jump over 3 character field
+	str_start_ptr += 3;
+	// ignore empty space
+	while (*str_start_ptr == '=' || *str_start_ptr == ' ')
+		++str_start_ptr;
+
+	if ((str_ptr=strchr(str_start_ptr, ',')) ||
+	    (str_ptr=strchr(str_start_ptr, ' ')) ||
+		(str_ptr=strchr(str_start_ptr, '\n'))) {
+
+			sub_str_size = strlen(str_start_ptr) - strlen(str_ptr);
+			strncpy(result_string, str_start_ptr, sub_str_size);
+			if (is_float) {
+				retval = (int)(atof(result_string)*100);
+			}
+			else {
+				retval = atoi(result_string);
+			}
+	}
+
+	return retval;
+}
+
+/**
+ * @brief  Simple string parsing wrapper to take care of
+ *         extracting string from 'dir' field.
+ * @param  str_start_ptr: Start of 'dir'field,
+ *                        Including the field name.
+ * @param  result_str: Reference of where to put result.
+ * @retval None
+ */
+void parse_sub_string(char *str_start_ptr, char *result_str) {
+
+	size_t sub_str_size;
+	char *str_ptr;
+
+	// jump over 3 character field
+	str_start_ptr += 3;
+	// ignore empty space
+	while (*str_start_ptr == '=' || *str_start_ptr == ' ')
+		++str_start_ptr;
+
+	if ((str_ptr=strchr(str_start_ptr, ',')) ||
+	    (str_ptr=strchr(str_start_ptr, ' ')) ||
+		(str_ptr=strchr(str_start_ptr, '\n'))) {
+
+			sub_str_size = strlen(str_start_ptr) - strlen(str_ptr);
+			strncpy(result_str, str_start_ptr, sub_str_size);
+	}
+}
 
 /**
  * @brief  Wrapper for transmitting/receiving between
@@ -94,7 +186,7 @@ int main()
  * @param  payload: C string to send to Kernel space.
  * @retval None
  */
-void comm_handler(char *payload) {
+void netlink_send_string(char *payload) {
 
 	struct sockaddr_nl src_addr;
 	struct sockaddr_nl dest_addr;
@@ -119,10 +211,10 @@ void comm_handler(char *payload) {
     bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
 
 	/* allocate memory for the netlink message handler object */
-    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
+    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_STRING_SIZE));
 
     /* Fill the netlink message header */
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    nlh->nlmsg_len = NLMSG_SPACE(MAX_STRING_SIZE);
     nlh->nlmsg_pid = getpid();  /* self pid */
     nlh->nlmsg_flags = 0;
 	
@@ -158,7 +250,7 @@ void comm_handler(char *payload) {
     }
 
     /* Read message from kernel */
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
+    memset(nlh, 0, NLMSG_SPACE(MAX_STRING_SIZE));
 
 	/* get a response from Kernel */
     rc = recvmsg(sock_fd, &msg, 0);
