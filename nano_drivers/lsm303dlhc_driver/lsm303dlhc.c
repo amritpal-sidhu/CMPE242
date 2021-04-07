@@ -52,7 +52,7 @@ int jetson_nano_i2c_init(void) {
 
   int retval = 0;
 
-  if ((i2c_fd = open(JETSON_NANO_I2C_LINUX_DEVICE_NAME, O_RDWR)) < 0) {
+  if ((i2c_fd = open(JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
     retval = -1;
   }
 
@@ -414,6 +414,13 @@ uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
   struct i2c_rdwr_ioctl_data ioctl_data;
   uint16_t write_status = 1;
 
+
+
+  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
+    printf("Error setting slave address\n");
+    write_status = 0;
+  }
+
   // Writing SUB address to read
   ioctl_msg[0].addr = DeviceAddr;
   ioctl_msg[0].buf = &RegAddr;
@@ -454,6 +461,11 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
   
   if(NumByteToRead>1)
       RegAddr |= 0x80;
+
+  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
+    printf("Error setting slave address\n");
+    read_status = 0;
+  }
 
   // Writing SUB address to read
   ioctl_msg[0].addr = DeviceAddr;
