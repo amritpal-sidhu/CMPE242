@@ -410,31 +410,19 @@ uint8_t LSM303DLHC_MagGetDataStatus(void)
   */
 uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
 {  
-  struct i2c_msg ioctl_msg[2];
+  struct i2c_msg ioctl_msg;
   struct i2c_rdwr_ioctl_data ioctl_data;
+  uint8_t write_buf[2] = {RegAddr, *pBuffer};
   uint16_t write_status = 1;
 
+  // Writing SUB address followed by write value without address sent again
+  ioctl_msg.addr = DeviceAddr;
+  ioctl_msg.buf = write_buf;
+  ioctl_msg.len = 2;
+  ioctl_msg.flags = 0;
 
-
-  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
-    printf("Error setting slave address\n");
-    write_status = 0;
-  }
-
-  // Writing SUB address to read
-  ioctl_msg[0].addr = DeviceAddr;
-  ioctl_msg[0].buf = &RegAddr;
-  ioctl_msg[0].len = 1;
-  ioctl_msg[0].flags = 0;
-
-  // Writing to SUB address
-  ioctl_msg[1].addr = DeviceAddr;
-  ioctl_msg[1].buf = pBuffer;
-  ioctl_msg[1].len = 1;
-  ioctl_msg[1].flags = 0;
-
-  ioctl_data.msgs = ioctl_msg;
-  ioctl_data.nmsgs = 2;
+  ioctl_data.msgs = &ioctl_msg;
+  ioctl_data.nmsgs = 1;
 
   if (ioctl(i2c_fd, I2C_RDWR, &ioctl_data) < 0) {
     printf("Writing LSM303DLHC failed\n");
@@ -461,11 +449,6 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
   
   if(NumByteToRead>1)
       RegAddr |= 0x80;
-
-  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
-    printf("Error setting slave address\n");
-    read_status = 0;
-  }
 
   // Writing SUB address to read
   ioctl_msg[0].addr = DeviceAddr;
