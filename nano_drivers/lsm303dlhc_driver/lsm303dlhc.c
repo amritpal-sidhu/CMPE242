@@ -51,9 +51,16 @@ static int i2c_fd = -1;
 int jetson_nano_i2c_init(void) {
 
   int retval = 0;
+  unsigned long func;
 
   if ((i2c_fd = open(JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
     retval = -1;
+  }
+  else {
+    ioctl(i2c_fd, I2C_FUNC_I2C, &func);
+    if (!(func & I2C_FUNC_I2C)) {
+      printf("Adapter %li does not have I2C_FUNC_I2C\n", func);
+    }
   }
 
   return retval;
@@ -405,40 +412,39 @@ uint8_t LSM303DLHC_MagGetDataStatus(void)
   *         I2C device driver for the Nvidia Jetson Nano.
   * @param  DeviceAddr : specifies the slave address to be programmed.
   * @param  RegAddr : specifies the LSM303DLHC register to be written.
-  * @param  pBuffer : pointer to the buffer  containing the data to be written to the LSM303DLHC.
+  * @param  pBuffer : pointer to the buffer containing the data to be written to the LSM303DLHC.
+  *                   It is assumed to be statically allocated memory.
   * @retval 1 on success, 0 on failure.
   */
 uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
 {  
-  struct i2c_msg ioctl_msg[2];
+  struct i2c_msg ioctl_msg;
   struct i2c_rdwr_ioctl_data ioctl_data;
+  const uint16_t write_size = (sizeof(pBuffer)/sizeof(uint8_t)) + 1;
+  uint8_t write_buffer[write_size];
   uint16_t write_status = 1;
 
+  // needed to work with ioctl
+  RegAddr >>= 1;
 
-
-  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
-    printf("Error setting slave address\n");
-    write_status = 0;
+  // fill write buffer with SUB + write data
+  write_buffer[0] = RegAddr;
+  for (size_t i = 1; i < write_size; ++i) {
+      write_buffer[i] = pBuffer[i-1];
   }
 
-  // Writing SUB address to read
-  ioctl_msg[0].addr = DeviceAddr;
-  ioctl_msg[0].buf = &RegAddr;
-  ioctl_msg[0].len = 1;
-  ioctl_msg[0].flags = 0;
+  // Write data to device
+  ioctl_msg.addr = DeviceAddr;
+  ioctl_msg.buf = write_buffer;
+  ioctl_msg.len = write_size;
+  ioctl_msg.flags = 0;
 
-  // Writing to SUB address
-  ioctl_msg[1].addr = DeviceAddr;
-  ioctl_msg[1].buf = pBuffer;
-  ioctl_msg[1].len = 1;
-  ioctl_msg[1].flags = 0;
-
-  ioctl_data.msgs = ioctl_msg;
-  ioctl_data.nmsgs = 2;
+  ioctl_data.msgs = &ioctl_msg;
+  ioctl_data.nmsgs = 1;
 
   if (ioctl(i2c_fd, I2C_RDWR, &ioctl_data) < 0) {
-    printf("Writing LSM303DLHC failed\n");
-    write_status = 0;
+      printf("Writing LSM303DLHC failed\n");
+      write_status = 0;
   }
   
   return write_status;
@@ -462,10 +468,8 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
   if(NumByteToRead>1)
       RegAddr |= 0x80;
 
-  if ((ioctl(i2c_fd, I2C_TENBIT, 0) < 0) || (ioctl(i2c_fd, I2C_SLAVE, DeviceAddr) < 0)) {
-    printf("Error setting slave address\n");
-    read_status = 0;
-  }
+  // needed to work with ioctl
+  RegAddr >>= 1;
 
   // Writing SUB address to read
   ioctl_msg[0].addr = DeviceAddr;
@@ -483,8 +487,8 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
   ioctl_data.nmsgs = 2;
 
   if (ioctl(i2c_fd, I2C_RDWR, &ioctl_data) < 0) {
-    printf("Reading LSM303DLHC failed\n");
-    read_status = 0;
+      printf("Reading LSM303DLHC failed\n");
+      read_status = 0;
   }
   
   return read_status;

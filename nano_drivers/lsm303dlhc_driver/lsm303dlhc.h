@@ -142,8 +142,8 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
 /**************************** END REGISTER MAPPING  ***************************/
 /******************************************************************************/
 
-#define ACC_I2C_ADDRESS                      0x19 // 0x32
-#define MAG_I2C_ADDRESS                      0x1E // 0x3C
+#define ACC_I2C_ADDRESS                      0x32
+#define MAG_I2C_ADDRESS                      0x3C
 
 /** @defgroup Acc_Power_Mode_selection 
   * @{
