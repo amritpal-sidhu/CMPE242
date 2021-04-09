@@ -57,7 +57,7 @@ int jetson_nano_i2c_init(void) {
     retval = -1;
   }
   else {
-    ioctl(i2c_fd, I2C_FUNC_I2C, &func);
+    ioctl(i2c_fd, I2C_FUNCS, &func);
     if (!(func & I2C_FUNC_I2C)) {
       printf("Adapter %li does not have I2C_FUNC_I2C\n", func);
     }
@@ -420,23 +420,16 @@ uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
 {  
   struct i2c_msg ioctl_msg;
   struct i2c_rdwr_ioctl_data ioctl_data;
-  const uint16_t write_size = (sizeof(pBuffer)/sizeof(uint8_t)) + 1;
-  uint8_t write_buffer[write_size];
+  uint8_t write_buffer[2] = {RegAddr, *pBuffer};
   uint16_t write_status = 1;
 
   // needed to work with ioctl
-  RegAddr >>= 1;
-
-  // fill write buffer with SUB + write data
-  write_buffer[0] = RegAddr;
-  for (size_t i = 1; i < write_size; ++i) {
-      write_buffer[i] = pBuffer[i-1];
-  }
+  DeviceAddr >>= 1;
 
   // Write data to device
   ioctl_msg.addr = DeviceAddr;
   ioctl_msg.buf = write_buffer;
-  ioctl_msg.len = write_size;
+  ioctl_msg.len = 2;
   ioctl_msg.flags = 0;
 
   ioctl_data.msgs = &ioctl_msg;
@@ -469,7 +462,7 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
       RegAddr |= 0x80;
 
   // needed to work with ioctl
-  RegAddr >>= 1;
+  DeviceAddr >>= 1;
 
   // Writing SUB address to read
   ioctl_msg[0].addr = DeviceAddr;

@@ -203,6 +203,17 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
   * @}
   */
   
+/** @defgroup Acc_Sensitivity 
+  * @{
+  */
+#define LSM303DLHC_A_SENSITIVITY_2G     1     /*!< Accelerometer sensitivity for ±2 g full scale [mg/LSB] */
+#define LSM303DLHC_A_SENSITIVITY_4G     2     /*!< Accelerometer sensitivity for ±4 g full scale [mg/LSB] */
+#define LSM303DLHC_A_SENSITIVITY_8G     4     /*!< Accelerometer sensitivity for ±8 g full scale [mg/LSB] */
+#define LSM303DLHC_A_SENSITIVITY_16G    12    /*!< Accelerometer sensitivity for ±16 g full scale [mg/LSB] */
+/**
+  * @}
+  */
+  
 /** @defgroup Acc_Block_Data_Update 
   * @{
   */  
