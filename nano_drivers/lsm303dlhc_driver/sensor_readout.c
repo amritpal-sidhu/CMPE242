@@ -1,5 +1,16 @@
 #include <stdio.h>
+#include <signal.h>
+
 #include "lsm303dlhc.h"
+
+sig_atomic_t stop_signal = 0;
+
+void stop_handler(int param) {
+    if (param) {
+        /* ignore param */
+    }
+    stop_signal = 1;
+}
 
 int main(void) {
 
@@ -15,9 +26,6 @@ int main(void) {
         printf("I2C initialization failed, exiting program\n");
         return -1;
     }
-
-	/* Reboot sensor */
-	LSM303DLHC_AccRebootCmd();
 
     /* Initialize accelerometer */
     acc_init.Power_Mode = LSM303DLHC_NORMAL_MODE;
@@ -44,25 +52,41 @@ int main(void) {
     LSM303DLHC_AccFilterConfig(&acc_filter_config);
     LSM303DLHC_AccFilterCmd(LSM303DLHC_HIGHPASSFILTER_ENABLE);
 
-    for (;;) {
+    printf("Printing acc config register values for debugging\n");
+    LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_CTRL_REG1_A, data_buf, 6);
+    for (size_t i = 0; i < 6; ++i) {
+        printf("reg%li_a val = 0x%x\n", i+1, data_buf[i]);
+    }
+
+    printf("\nPrinting mag config register values for debugging\n");
+    LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_CRA_REG_M, data_buf, 3);
+    for (size_t i = 0; i < 3; ++i) {
+        printf("reg%li_m val = 0x%x\n", i+1, data_buf[i]);
+    }
+    printf("\n");
+    
+    signal(SIGINT, stop_handler);
+
+    while (!stop_signal) {
         
         LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, data_buf, 6);
         for (size_t i = 0; i < 3; ++i) {
-        	acc[i] = ((int16_t)((data_buf[2*i+1] << 8) | data_buf[2*i])>>4) * LSM303DLHC_A_SENSITIVITY_2G;
+        	acc[i] = ((int16_t)(((uint16_t)data_buf[2*i+1] << 8) | data_buf[2*i])>>4) * LSM303DLHC_A_SENSITIVITY_2G;
         }
         
         LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_OUT_X_H_M, data_buf, 6);
         for (size_t i = 0; i < 3; ++i) {
         	if (i == 1)
-        		mag[i] = (float)((int16_t)((data_buf[2*i] << 8) | data_buf[2*i+1])) / LSM303DLHC_M_SENSITIVITY_Z_1_3Ga;
+        		mag[i] = (float)((int16_t)(((uint16_t)data_buf[2*i] << 8) | data_buf[2*i+1])) / LSM303DLHC_M_SENSITIVITY_Z_1_3Ga;
         	else
-        		mag[i] = (float)((int16_t)((data_buf[2*i] << 8) | data_buf[2*i+1])) / LSM303DLHC_M_SENSITIVITY_XY_1_3Ga;
+        		mag[i] = (float)((int16_t)(((uint16_t)data_buf[2*i] << 8) | data_buf[2*i+1])) / LSM303DLHC_M_SENSITIVITY_XY_1_3Ga;
         }
 
         printf("\racc x = %6img, y = %6img, z = %6img\tmag x = %5.3fGa, y = %5.3fGa, z = %5.3fGa", acc[0], acc[1], acc[2], mag[0], mag[2], mag[1]);
         fflush(stdout);
     }
 
+    printf("\nClosing I2C and terminating program\n");
     jetson_nano_i2c_deinit();
 
     return 0;
