@@ -21,6 +21,7 @@ int main(void) {
     int16_t acc[3];
     float mag[3];
     uint8_t data_buf[6];
+    uint8_t acc_raw[6];
 
     if (jetson_nano_i2c_init() == -1) {
         printf("I2C initialization failed, exiting program\n");
@@ -29,7 +30,7 @@ int main(void) {
 
     /* Initialize accelerometer */
     acc_init.Power_Mode = LSM303DLHC_NORMAL_MODE;
-    acc_init.AccOutput_DataRate = LSM303DLHC_ODR_400_HZ;
+    acc_init.AccOutput_DataRate = LSM303DLHC_ODR_1_HZ;
     acc_init.Axes_Enable = LSM303DLHC_AXES_ENABLE;
     acc_init.High_Resolution = LSM303DLHC_HR_ENABLE;
     acc_init.BlockData_Update = LSM303DLHC_BlockUpdate_Continous;
@@ -70,8 +71,9 @@ int main(void) {
     while (!stop_signal) {
         
         LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, data_buf, 6);
+        LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, acc_raw, 6);
         for (size_t i = 0; i < 3; ++i) {
-        	acc[i] = ((int16_t)(((uint16_t)data_buf[2*i+1] << 8) | data_buf[2*i])>>4) * LSM303DLHC_A_SENSITIVITY_2G;
+        	acc[i] = ((int16_t)(((uint16_t)data_buf[2*i+1] << 8) | data_buf[2*i])/16) * LSM303DLHC_A_SENSITIVITY_2G;
         }
         
         LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_OUT_X_H_M, data_buf, 6);
@@ -82,7 +84,8 @@ int main(void) {
         		mag[i] = (float)((int16_t)(((uint16_t)data_buf[2*i] << 8) | data_buf[2*i+1])) / LSM303DLHC_M_SENSITIVITY_XY_1_3Ga;
         }
 
-        printf("\racc x = %6img, y = %6img, z = %6img\tmag x = %5.3fGa, y = %5.3fGa, z = %5.3fGa", acc[0], acc[1], acc[2], mag[0], mag[2], mag[1]);
+        // printf("\racc x = %6img, y = %6img, z = %6img\tmag x = %5.3fGa, y = %5.3fGa, z = %5.3fGa", acc[0], acc[1], acc[2], mag[0], mag[2], mag[1]);
+        printf("\racc_raw x_h = 0x%2x, x_l = 0x%2x, y_h = 0x%2x, y_l = 0x%2x, z_h = 0x%2x, z_l = 0x%2x", acc_raw[1], acc_raw[0], acc_raw[3], acc_raw[2], acc_raw[5], acc_raw[4]);
         fflush(stdout);
     }
 

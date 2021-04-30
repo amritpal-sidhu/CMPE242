@@ -1,5 +1,5 @@
 CXX = $(CROSS_COMPILE)gcc
-CXXFLAGS = -c -g -Wall -W -Werror -pedantic
+CXXFLAGS = -c -g -Wall -W -pedantic
 LDFLAGS = 
 
 sensor_readout: sensor_readout.o lsm303dlhc.o
