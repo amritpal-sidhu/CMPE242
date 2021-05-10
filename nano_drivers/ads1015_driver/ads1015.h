@@ -18,12 +18,12 @@ typedef struct {
 
 /**
  * Jetson nano I2C0 on J41 pin header:
- *   I2C0_SDA - pin 27 - PB.05
- *   I2C0_SCL - pin 28 - PC.02
+ *   I2C1_SDA - pin 3 - PJ.03
+ *   I2C1_SCL - pin 5 - PJ.02
  * This program is using the linux device drivers to interface
- * with the LSM303DLHC
+ * with the ADS1015
  */
-#define JETSON_NANO_I2C_BUS                  "/dev/i2c-1"
+#define ADS1015_JETSON_NANO_I2C_BUS     "/dev/i2c-1"
 
 
 /**
@@ -36,12 +36,12 @@ typedef struct {
  * Register mapping.
  * All are 16-bit R/W Registers
  */
-#define ADS1015_CONV_REG                0x00 /* Data read */
+#define ADS1015_CONV_REG                0x00    /* Data read */
 #define ADS1015_CONFIG_REG              0x01
 #define ADS1015_LO_THRES_REG            0x02
 #define ADS1015_HI_THRES_REG            0x03
 
-#define I2C_ADDRESS                     0x32
+#define ADS1015_I2C_ADDRESS             0x48    /* when ADDR pin is connected to GND */
 
 /**
  * Possible multiplexer configurations
@@ -85,8 +85,8 @@ typedef struct {
 /**
  * Possible comparator polarity
  */
-#define ADS1015_COMP_ACTIVE_LOW        0x00
-#define ADS1015_COMP_ACTIVE_HIGH       0x01
+#define ADS1015_COMP_ACTIVE_LOW         0x00
+#define ADS1015_COMP_ACTIVE_HIGH        0x01
 
 /**
  * Possible comparator latching
@@ -108,18 +108,19 @@ typedef struct {
 /**
  * Open Linux I2C file descriptor.
  */
-int jetson_nano_i2c_init(void);
+int ADS1015_jetson_nano_i2c_init(void);
 
 /**
  * Close Linux I2C file descriptor.
  */
-void jetson_nano_i2c_deinit(void);
+void ADS1015_jetson_nano_i2c_deinit(void);
 
 /**
  * ADS1015 function  prototypes
  */
-void ADS1015_config(void);
+void ADS1015_config_adc(ADS1015_adc_config config_data);
 void ADS1015_start_conversion(void);
+void ADS1015_config_comp(ADS1015_comp_config config_data);
 
 /**
  * Read/Write funtion prototypes
@@ -142,7 +143,6 @@ uint16_t ADS1015_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer);
   * @param  DeviceAddr : specifies the slave address to be programmed(ACC_I2C_ADDRESS or MAG_I2C_ADDRESS).
   * @param  RegAddr : specifies the LSM303DLHC internal address register to read from.
   * @param  pBuffer : pointer to the buffer that receives the data read from the LSM303DLH.
-  * @param  NumByteToRead : number of bytes to read from the LSM303DLH ( NumByteToRead >1  only for the Mgnetometer readinf).
   * @retval 1 on success, 0 on failure.
   */
-uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer, uint16_t NumByteToRead);
+uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer);

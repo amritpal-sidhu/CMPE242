@@ -48,12 +48,12 @@ static int i2c_fd = -1;
  * @param  None
  * @retval -1 on error, file descriptor on success.
  */
-int jetson_nano_i2c_init(void) {
+int LSM303DLHC_jetson_nano_i2c_init(void) {
 
   int retval = 0;
   unsigned long func;
 
-  if ((i2c_fd = open(JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
+  if ((i2c_fd = open(LSM303DLHC_JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
     retval = -1;
   }
   else {
@@ -71,7 +71,7 @@ int jetson_nano_i2c_init(void) {
  * @param  None
  * @retval None
  */
-void jetson_nano_i2c_deinit(void) {
+void LSM303DLHC_jetson_nano_i2c_deinit(void) {
 
   close(i2c_fd);
 }

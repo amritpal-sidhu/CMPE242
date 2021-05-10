@@ -78,7 +78,7 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
  * This program is using the linux device drivers to interface
  * with the LSM303DLHC
  */
-#define JETSON_NANO_I2C_BUS                  "/dev/i2c-0"
+#define LSM303DLHC_JETSON_NANO_I2C_BUS      "/dev/i2c-0"
 
 
 /******************************************************************************/
@@ -455,8 +455,8 @@ typedef enum {DISABLE = 0, ENABLE = !DISABLE} FunctionalState;
  * @defgroup Jetson_Nano_Linux_I2C_Functions
  * 
  */
-int jetson_nano_i2c_init(void);
-void jetson_nano_i2c_deinit(void);
+int LSM303DLHC_jetson_nano_i2c_init(void);
+void LSM303DLHC_jetson_nano_i2c_deinit(void);
 
 /** @defgroup LSM303DLHC_Functions
   * @{

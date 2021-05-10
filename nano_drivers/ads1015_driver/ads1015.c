@@ -17,11 +17,11 @@ static int i2c_fd = -1;
  * Function definitions
  */
 
-int jetson_nano_i2c_init(void) {
+int ADS1015_jetson_nano_i2c_init(void) {
     int retval = 0;
     unsigned long func;
 
-    if ((i2c_fd = open(JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
+    if ((i2c_fd = open(ADS1015_JETSON_NANO_I2C_BUS, O_RDWR)) < 0) {
         retval = -1;
     }
     else {
@@ -34,16 +34,47 @@ int jetson_nano_i2c_init(void) {
     return retval;
 }
 
-void jetson_nano_i2c_deinit(void) {
+void ADS1015_jetson_nano_i2c_deinit(void) {
     close(i2c_fd);
 }
 
-void ADS1015_config(void) {
+void ADS1015_config(ADS1015_adc_config config_data) {
+    uint8_t reg_data[2];
 
+    ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
+
+    reg_data[0] &= ~0xE0; // clear data rate bits
+    reg_data[0] |= config_data.data_rate << 5;
+    reg_data[1] &= ~0xFF;
+    reg_data[1] |= (config_data.mux_config << 4) | (config_data.pga_fsr << 1) | config_data.mode;
+
+    ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
 }
 
 void ADS1015_start_conversion(void) {
+    uint8_t reg_data[2];
 
+    ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
+
+    if (reg_data[1] & 0x01) {
+
+        reg_data[1] |= 0x80;
+        ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
+    }
+    else {
+        printf("ADS1015 is not in single shot mode\n");
+    }
+}
+
+void ADS1015_config_comp(ADS1015_comp_config config_data) {
+    uint8_t reg_data[2];
+
+    ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
+
+    reg_data[0] &= ~0x1F; // clear data rate bits
+    reg_data[0] |= (config_data.mode << 4) | (config_data.polarity << 3) | (config_data.latching << 2) | config_data.queue;
+
+    ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
 }
 
 /* read write funtions */
@@ -51,7 +82,7 @@ uint16_t ADS1015_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer) {
     
     struct i2c_msg ioctl_msg;
     struct i2c_rdwr_ioctl_data ioctl_data;
-    uint8_t write_buffer[2] = {RegAddr, *pBuffer};
+    uint8_t write_buffer[3] = {RegAddr, pBuffer[0], pBuffer[1]};
     uint16_t write_status = 1;
 
     // needed to work with ioctl
@@ -60,7 +91,7 @@ uint16_t ADS1015_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer) {
     // Write data to device
     ioctl_msg.addr = DeviceAddr;
     ioctl_msg.buf = write_buffer;
-    ioctl_msg.len = 2;
+    ioctl_msg.len = 3;
     ioctl_msg.flags = 0;
 
     ioctl_data.msgs = &ioctl_msg;
@@ -74,14 +105,11 @@ uint16_t ADS1015_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer) {
     return write_status;
 }
 
-uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer, uint16_t NumByteToRead) {
+uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer) {
     
     struct i2c_msg ioctl_msg[2];
     struct i2c_rdwr_ioctl_data ioctl_data;
     uint16_t read_status = 1;
-    
-    if(NumByteToRead>1)
-        RegAddr |= 0x80;
 
     // needed to work with ioctl
     DeviceAddr >>= 1;
@@ -95,7 +123,7 @@ uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer, uint
     // Reading from SUB address
     ioctl_msg[1].addr = DeviceAddr;
     ioctl_msg[1].buf = pBuffer;
-    ioctl_msg[1].len = NumByteToRead;
+    ioctl_msg[1].len = 2;
     ioctl_msg[1].flags = I2C_M_RD;
 
     ioctl_data.msgs = ioctl_msg;
