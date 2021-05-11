@@ -38,14 +38,14 @@ void ADS1015_jetson_nano_i2c_deinit(void) {
     close(i2c_fd);
 }
 
-void ADS1015_config(ADS1015_adc_config config_data) {
+void ADS1015_config_adc(ADS1015_adc_config config_data) {
     uint8_t reg_data[2];
 
     ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
 
-    reg_data[0] &= ~0xE0; // clear data rate bits
+    reg_data[0] &= 0x1F; // clear data rate bits
     reg_data[0] |= config_data.data_rate << 5;
-    reg_data[1] &= ~0xFF;
+    reg_data[1] &= 0x00;
     reg_data[1] |= (config_data.mux_config << 4) | (config_data.pga_fsr << 1) | config_data.mode;
 
     ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
@@ -75,6 +75,17 @@ void ADS1015_config_comp(ADS1015_comp_config config_data) {
     reg_data[0] |= (config_data.mode << 4) | (config_data.polarity << 3) | (config_data.latching << 2) | config_data.queue;
 
     ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
+}
+
+int16_t ADS1015_read(void) {
+    uint8_t adc_raw_data[2];
+    int16_t adc_data;
+
+    ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONV_REG, adc_raw_data);
+
+    adc_data = ((int16_t)((int8_t)(adc_raw_data[1] & 0x0F)) << 8) | adc_raw_data[0];
+
+    return adc_data;
 }
 
 /* read write funtions */

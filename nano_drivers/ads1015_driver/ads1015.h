@@ -80,7 +80,7 @@ typedef struct {
  * Possible comparator modes
  */
 #define ADS1015_COMP_NORMAL_MODE        0x00
-#define ADS1015_COMP_NORMAL_MODE        0x01
+#define ADS1015_COMP_WINDOW_MODE        0x01
 
 /**
  * Possible comparator polarity
@@ -121,6 +121,7 @@ void ADS1015_jetson_nano_i2c_deinit(void);
 void ADS1015_config_adc(ADS1015_adc_config config_data);
 void ADS1015_start_conversion(void);
 void ADS1015_config_comp(ADS1015_comp_config config_data);
+int16_t ADS1015_read(void);
 
 /**
  * Read/Write funtion prototypes
