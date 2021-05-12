@@ -29,8 +29,8 @@ typedef struct {
 /**
  * Possible modes
  */
-#define ADS1015_CONTINUOUS              0x01
-#define ADS1015_SINGLE_SHOT             0x02
+#define ADS1015_CONTINUOUS              0x00
+#define ADS1015_SINGLE_SHOT             0x01
 
 /**
  * Register mapping.

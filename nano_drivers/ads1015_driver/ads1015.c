@@ -84,7 +84,7 @@ int16_t ADS1015_get_data(void) {
 
     ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONV_REG, adc_raw_data);
 
-    adc_data = ((int16_t)((int8_t)(adc_raw_data[0] & 0x0F)) << 8) | adc_raw_data[1];
+    adc_data = (((int16_t)adc_raw_data[0] << 8) | adc_raw_data[1]) >> 4;
 
     return adc_data;
 }
