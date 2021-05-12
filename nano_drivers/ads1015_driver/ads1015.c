@@ -96,9 +96,6 @@ uint16_t ADS1015_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer) {
     uint8_t write_buffer[3] = {RegAddr, pBuffer[0], pBuffer[1]};
     uint16_t write_status = 1;
 
-    // needed to work with ioctl
-    DeviceAddr >>= 1;
-
     // Write data to device
     ioctl_msg.addr = DeviceAddr;
     ioctl_msg.buf = write_buffer;
@@ -121,9 +118,6 @@ uint16_t ADS1015_Read(uint8_t DeviceAddr, uint8_t RegAddr,uint8_t* pBuffer) {
     struct i2c_msg ioctl_msg[2];
     struct i2c_rdwr_ioctl_data ioctl_data;
     uint16_t read_status = 1;
-
-    // needed to work with ioctl
-    DeviceAddr >>= 1;
 
     // Writing SUB address to read
     ioctl_msg[0].addr = DeviceAddr;
