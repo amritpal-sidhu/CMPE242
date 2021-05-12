@@ -33,7 +33,7 @@ int main(void) {
 
     // reading out config register for debugging
     ADS1015_Read(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
-    printf("config reg low = %x, high = %x", reg_data[0], reg_data[1]);
+    printf("config reg low = 0x%x, high = 0x%x\n", reg_data[0], reg_data[1]);
 
     signal(SIGINT, stop_handler);
 
