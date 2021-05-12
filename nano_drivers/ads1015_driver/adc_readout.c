@@ -34,7 +34,7 @@ int main(void) {
 
     while (!stop_signal) {
 
-        adc_data = ADS1015_read();
+        adc_data = ADS1015_get_data();
 
         printf("\radc data = %6i", adc_data);
         fflush(stdout);

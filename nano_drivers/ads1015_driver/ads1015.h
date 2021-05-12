@@ -121,7 +121,7 @@ void ADS1015_jetson_nano_i2c_deinit(void);
 void ADS1015_config_adc(ADS1015_adc_config config_data);
 void ADS1015_start_conversion(void);
 void ADS1015_config_comp(ADS1015_comp_config config_data);
-int16_t ADS1015_read(void);
+int16_t ADS1015_get_data(void);
 
 /**
  * Read/Write funtion prototypes

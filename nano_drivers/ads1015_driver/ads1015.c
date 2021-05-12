@@ -77,7 +77,7 @@ void ADS1015_config_comp(ADS1015_comp_config config_data) {
     ADS1015_Write(ADS1015_I2C_ADDRESS, ADS1015_CONFIG_REG, reg_data);
 }
 
-int16_t ADS1015_read(void) {
+int16_t ADS1015_get_data(void) {
     uint8_t adc_raw_data[2];
     int16_t adc_data;
 
