@@ -20,7 +20,7 @@ int main(void) {
     ADS1015_adc_config adc_config = {
         .mode = ADS1015_CONTINUOUS,
         .mux_config = ADS1015_MUX_AIN0_SINGLE,
-        .data_rate = ADS1015_RATE_1600SPS,
+        .data_rate = ADS1015_RATE_920SPS,
         .pga_fsr = ADS1015_PGA_4_096
     };
 
