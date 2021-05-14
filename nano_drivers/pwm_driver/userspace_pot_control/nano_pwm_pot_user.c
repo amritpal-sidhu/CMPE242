@@ -79,33 +79,36 @@ int adc_value_to_pwm_control(int16_t adc_value) {
     int freq_value;
 
     if (adc_value < 128 || adc_value > 3500) {
-        freq_value = 100;
+        freq_value = 0;
     }
     else if (adc_value < 255) {
-        freq_value = 200;
+        freq_value = 100;
     }
     else if (adc_value < 386) {
-        freq_value = 300;
+        freq_value = 200;
     }
     else if (adc_value < 510) {
-        freq_value = 400;
+        freq_value = 300;
     }
     else if (adc_value < 638) {
-        freq_value = 500;
+        freq_value = 400;
     }
     else if (adc_value < 765) {
-        freq_value = 600;
+        freq_value = 500;
     }
     else if (adc_value < 893) {
-        freq_value = 700;
+        freq_value = 600;
     }
     else if (adc_value < 1020) {
-        freq_value = 800;
+        freq_value = 700;
     }
     else if (adc_value < 1148) {
-        freq_value = 900;
+        freq_value = 800;
     }
     else if (adc_value < 1275) {
+        freq_value = 900;
+    }
+    else {
         freq_value = 1000;
     }
 
