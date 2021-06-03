@@ -43,6 +43,10 @@
 
 static int i2c_fd = -1;
 
+static int16_t LSM303DLHC_AccDataConversion(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct, const uint8_t *data_reg_values);
+static float LSM303DLHC_MagDataConversion(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct, const uint8_t *data_reg_values, const uint8_t isZData);
+
+
 /**
  * @brief  Open Linux I2C file descriptor.
  * @param  None
@@ -82,7 +86,7 @@ void LSM303DLHC_jetson_nano_i2c_deinit(void) {
   *         that contains the configuration setting for the LSM303DLHC.
   * @retval None
   */
-void LSM303DLHC_AccInit(LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct)
+void LSM303DLHC_AccInit(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct)
 {  
   uint8_t ctrl1 = 0x00, ctrl4 = 0x00;
   
@@ -125,7 +129,7 @@ void LSM303DLHC_AccRebootCmd(void)
   *         that contains the configuration setting for the LSM303DLHC.        
   * @retval None
   */
-void LSM303DLHC_AccFilterConfig(LSM303DLHCAcc_FilterConfigTypeDef *LSM303DLHC_FilterStruct) 
+void LSM303DLHC_AccFilterConfig(const LSM303DLHCAcc_FilterConfigTypeDef *LSM303DLHC_FilterStruct) 
 {
   uint8_t tmpreg;
   
@@ -152,7 +156,7 @@ void LSM303DLHC_AccFilterConfig(LSM303DLHCAcc_FilterConfigTypeDef *LSM303DLHC_Fi
   *         @arg: LSM303DLHC_HighPassFilter_ENABLE          
   * @retval None
   */
-void LSM303DLHC_AccFilterCmd(uint8_t HighPassFilterState)
+void LSM303DLHC_AccFilterCmd(const uint8_t HighPassFilterState)
  {
   uint8_t tmpreg;
   
@@ -175,7 +179,7 @@ void LSM303DLHC_AccFilterCmd(uint8_t HighPassFilterState)
   *         @arg: LSM303DLHC_HighPassFilter_ENABLE          
   * @retval None
   */
-void LSM303DLHC_AccFilterClickCmd(uint8_t HighPassFilterClickState)
+void LSM303DLHC_AccFilterClickCmd(const uint8_t HighPassFilterClickState)
  {
   uint8_t tmpreg;
   
@@ -204,7 +208,7 @@ void LSM303DLHC_AccFilterClickCmd(uint8_t HighPassFilterClickState)
   *          This parameter can be: ENABLE or DISABLE.
   * @retval None
   */
-void LSM303DLHC_AccIT1Config(uint8_t LSM303DLHC_IT, FunctionalState NewState)
+void LSM303DLHC_AccIT1Config(const uint8_t LSM303DLHC_IT, const FunctionalState NewState)
 {
   uint8_t tmpval = 0x00;
   
@@ -241,7 +245,7 @@ void LSM303DLHC_AccIT1Config(uint8_t LSM303DLHC_IT, FunctionalState NewState)
   *          This parameter can be: ENABLE or DISABLE.
   * @retval None
   */
-void LSM303DLHC_AccIT2Config(uint8_t LSM303DLHC_IT, FunctionalState NewState)
+void LSM303DLHC_AccIT2Config(const uint8_t LSM303DLHC_IT, const FunctionalState NewState)
 {
   uint8_t tmpval = 0x00;
   
@@ -271,7 +275,7 @@ void LSM303DLHC_AccIT2Config(uint8_t LSM303DLHC_IT, FunctionalState NewState)
   *         NewState: Enable or Disable    
   * @retval None
   */
-void LSM303DLHC_AccINT1InterruptConfig(uint8_t ITCombination, uint8_t ITAxes, FunctionalState NewState )
+void LSM303DLHC_AccINT1InterruptConfig(const uint8_t ITCombination, const uint8_t ITAxes, const FunctionalState NewState )
 {  
   uint8_t tmpval = ITCombination;
   
@@ -299,7 +303,7 @@ void LSM303DLHC_AccINT1InterruptConfig(uint8_t ITCombination, uint8_t ITAxes, Fu
   *         NewState: Enable or Disable    
   * @retval None
   */
-void LSM303DLHC_AccINT2InterruptConfig(uint8_t ITCombination, uint8_t ITAxes, FunctionalState NewState )
+void LSM303DLHC_AccINT2InterruptConfig(const uint8_t ITCombination, const uint8_t ITAxes, const FunctionalState NewState )
 {  
   uint8_t tmpval = ITCombination;
   
@@ -327,7 +331,7 @@ void LSM303DLHC_AccINT2InterruptConfig(uint8_t ITCombination, uint8_t ITAxes, Fu
   *         NewState: Enable or Disable    
   * @retval None
   */
-void LSM303DLHC_AccClickITConfig(uint8_t ITClick, FunctionalState NewState)
+void LSM303DLHC_AccClickITConfig(const uint8_t ITClick, const FunctionalState NewState)
 {  
   uint8_t tmpval;
   
@@ -363,13 +367,37 @@ uint8_t LSM303DLHC_AccGetDataStatus(void)
   return tmpreg;
 }
 
+int16_t LSM303DLHC_AccGetDataX(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, data_buf, 2);
+
+  return LSM303DLHC_AccDataConversion(LSM303DLHC_InitStruct, data_buf);
+}
+
+int16_t LSM303DLHC_AccGetDataY(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_Y_L_A, data_buf, 2);
+
+  return LSM303DLHC_AccDataConversion(LSM303DLHC_InitStruct, data_buf);
+}
+
+int16_t LSM303DLHC_AccGetDataZ(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_Z_L_A, data_buf, 2);
+
+  return LSM303DLHC_AccDataConversion(LSM303DLHC_InitStruct, data_buf);
+}
+
 /**
   * @brief  Set LSM303DLHC Mag Initialization.
   * @param  LSM303DLHC_InitStruct: pointer to a LSM303DLHC_MagInitTypeDef structure 
   *         that contains the configuration setting for the LSM303DLHC.
   * @retval None
   */
-void LSM303DLHC_MagInit(LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct)
+void LSM303DLHC_MagInit(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct)
 {  
   uint8_t cra_regm = 0x00, crb_regm = 0x00, mr_regm = 0x00;
   
@@ -407,6 +435,30 @@ uint8_t LSM303DLHC_MagGetDataStatus(void)
   return tmpreg;
 }
 
+float LSM303DLHC_MagGetDataX(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_OUT_X_H_M, data_buf, 2);
+
+  return LSM303DLHC_MagDataConversion(LSM303DLHC_InitStruct, data_buf, 0);
+}
+
+float LSM303DLHC_MagGetDataY(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_OUT_Y_H_M, data_buf, 2);
+
+  return LSM303DLHC_MagDataConversion(LSM303DLHC_InitStruct, data_buf, 0);
+}
+
+float LSM303DLHC_MagGetDataZ(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct) {
+  uint8_t data_buf[2];
+
+  LSM303DLHC_Read(MAG_I2C_ADDRESS, LSM303DLHC_OUT_Z_H_M, data_buf, 2);
+
+  return LSM303DLHC_MagDataConversion(LSM303DLHC_InitStruct, data_buf, 1);
+}
+
 /**
   * @brief  Writes one byte to the LSM303DLHC.  Adapted to use ioctrl and work with Linux
   *         I2C device driver for the Nvidia Jetson Nano.
@@ -416,7 +468,7 @@ uint8_t LSM303DLHC_MagGetDataStatus(void)
   *                   It is assumed to be statically allocated memory.
   * @retval 1 on success, 0 on failure.
   */
-uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
+uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, const uint8_t RegAddr, const uint8_t* pBuffer)
 {  
   struct i2c_msg ioctl_msg;
   struct i2c_rdwr_ioctl_data ioctl_data;
@@ -452,7 +504,7 @@ uint16_t LSM303DLHC_Write(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer)
   * @param  NumByteToRead : number of bytes to read from the LSM303DLH ( NumByteToRead >1  only for the Mgnetometer readinf).
   * @retval 1 on success, 0 on failure.
   */
-uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, uint16_t NumByteToRead)
+uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, const uint16_t NumByteToRead)
 {    
   struct i2c_msg ioctl_msg[2];
   struct i2c_rdwr_ioctl_data ioctl_data;
@@ -485,4 +537,95 @@ uint16_t LSM303DLHC_Read(uint8_t DeviceAddr, uint8_t RegAddr, uint8_t* pBuffer, 
   }
   
   return read_status;
-}  
+}
+
+/**
+ * @brief  Local helper function used to convert low & high accelerometer bytes into 16-bit value in milli Gs
+ * @param  LSM303DLHC_InitStruct: Pointer to accelerometer initialization structure
+ * @param  data_reg_values: Pointer to base address of array holding low and high register values.
+ * @retval 16-bit acceleration value
+ */
+static int16_t LSM303DLHC_AccDataConversion(const LSM303DLHCAcc_InitTypeDef *LSM303DLHC_InitStruct, const uint8_t *data_reg_values) {
+  int16_t result = 0;
+
+  if (LSM303DLHC_InitStruct->Endianness == LSM303DLHC_BLE_MSB) {
+    result = (((int16_t)data_reg_values[0] << 8) | data_reg_values[1]) >> 4;
+  }
+  else {
+    result = (((int16_t)data_reg_values[1] << 8) | data_reg_values[0]) >> 4;
+  }
+
+  switch (LSM303DLHC_InitStruct->AccFull_Scale)
+  {
+  case LSM303DLHC_FULLSCALE_2G:
+    result *= LSM303DLHC_A_SENSITIVITY_2G;
+    break;
+  
+  case LSM303DLHC_FULLSCALE_4G:
+    result *= LSM303DLHC_A_SENSITIVITY_4G;
+    break;
+
+  case LSM303DLHC_FULLSCALE_8G:
+    result *= LSM303DLHC_A_SENSITIVITY_8G;
+    break;
+
+  case LSM303DLHC_FULLSCALE_16G:
+    result *= LSM303DLHC_A_SENSITIVITY_16G;
+    break;
+
+  default:
+    result = 0;
+    break;
+  }
+
+  return result;
+}
+
+/**
+ * @brief  Local helper function used to convert low & high magnetometer bytes into float value in 
+ * @param  LSM303DLHC_InitStruct: Pointer to magnetometer initialization structure
+ * @param  data_reg_values: Pointer to base address of array holding low and high register values.
+ * @param  isZData: A non-zero value if the data is for the Z axis
+ * @retval single precision floating point magnetometer value
+ */
+static float LSM303DLHC_MagDataConversion(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct, const uint8_t *data_reg_values, const uint8_t isZData) {
+  
+  float result = ((int16_t)data_reg_values[0] << 8) | data_reg_values[1];
+
+  switch (LSM303DLHC_InitStruct->MagFull_Scale)
+  {
+  case LSM303DLHC_FS_1_3_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_1_3Ga : LSM303DLHC_M_SENSITIVITY_XY_1_3Ga;
+    break;
+  
+  case LSM303DLHC_FS_1_9_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_1_9Ga : LSM303DLHC_M_SENSITIVITY_XY_1_9Ga;
+    break;
+
+  case LSM303DLHC_FS_2_5_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_2_5Ga : LSM303DLHC_M_SENSITIVITY_XY_2_5Ga;
+    break;
+
+  case LSM303DLHC_FS_4_0_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_4Ga : LSM303DLHC_M_SENSITIVITY_XY_4Ga;
+    break;
+
+  case LSM303DLHC_FS_4_7_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_4_7Ga : LSM303DLHC_M_SENSITIVITY_XY_4_7Ga;
+    break;
+
+  case LSM303DLHC_FS_5_6_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_5_6Ga : LSM303DLHC_M_SENSITIVITY_XY_5_6Ga;
+    break;
+
+  case LSM303DLHC_FS_8_1_GA:
+    result /= isZData ? LSM303DLHC_M_SENSITIVITY_Z_8_1Ga : LSM303DLHC_M_SENSITIVITY_XY_8_1Ga;
+    break;
+
+  default:
+    result = 0;
+    break;
+  }
+
+  return result;
+}
