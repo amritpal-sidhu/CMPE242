@@ -549,10 +549,10 @@ static int16_t LSM303DLHC_AccDataConversion(const LSM303DLHCAcc_InitTypeDef *LSM
   int16_t result = 0;
 
   if (LSM303DLHC_InitStruct->Endianness == LSM303DLHC_BLE_MSB) {
-    result = (((int16_t)data_reg_values[0] << 8) | data_reg_values[1]) >> 4;
+    result = (int16_t)((uint16_t)data_reg_values[0] << 8 | data_reg_values[1]) >> 4;
   }
   else {
-    result = (((int16_t)data_reg_values[1] << 8) | data_reg_values[0]) >> 4;
+    result = (int16_t)((uint16_t)data_reg_values[1] << 8 | data_reg_values[0]) >> 4;
   }
 
   switch (LSM303DLHC_InitStruct->AccFull_Scale)
@@ -590,7 +590,7 @@ static int16_t LSM303DLHC_AccDataConversion(const LSM303DLHCAcc_InitTypeDef *LSM
  */
 static float LSM303DLHC_MagDataConversion(const LSM303DLHCMag_InitTypeDef *LSM303DLHC_InitStruct, const uint8_t *data_reg_values, const uint8_t isZData) {
   
-  float result = ((int16_t)data_reg_values[0] << 8) | data_reg_values[1];
+  float result = (float)((uint16_t)data_reg_values[0] << 8 | data_reg_values[1]);
 
   switch (LSM303DLHC_InitStruct->MagFull_Scale)
   {

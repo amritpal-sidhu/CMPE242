@@ -21,7 +21,7 @@ int main(void) {
     int16_t accX, accY, accZ;
     float magX, magY, magZ;
     uint8_t data_buf[6];
-    uint8_t acc_raw[6];
+    // uint8_t acc_raw[6];
 
     if (LSM303DLHC_jetson_nano_i2c_init() == -1) {
         printf("I2C initialization failed, exiting program\n");
@@ -30,7 +30,7 @@ int main(void) {
 
     /* Initialize accelerometer */
     acc_init.Power_Mode = LSM303DLHC_NORMAL_MODE;
-    acc_init.AccOutput_DataRate = LSM303DLHC_ODR_1_HZ;
+    acc_init.AccOutput_DataRate = LSM303DLHC_ODR_400_HZ;
     acc_init.Axes_Enable = LSM303DLHC_AXES_ENABLE;
     acc_init.High_Resolution = LSM303DLHC_HR_ENABLE;
     acc_init.BlockData_Update = LSM303DLHC_BlockUpdate_Continous;
@@ -76,10 +76,10 @@ int main(void) {
         magX = LSM303DLHC_MagGetDataX(&mag_init);
         magY = LSM303DLHC_MagGetDataY(&mag_init);
         magZ = LSM303DLHC_MagGetDataZ(&mag_init);
-        printf("\racc x = %6img, y = %6img, z = %6img\tmag x = %5.3fGa, y = %5.3fGa, z = %5.3fGa", accX, accY, accZ, magX, magY, magZ);
+        printf("\racc x = %6img, y = %6img, z = %6img\tmag x = %6.3fGa, y = %6.3fGa, z = %6.3fGa ", accX, accY, accZ, magX, magY, magZ);
         
-        LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, acc_raw, 6);
-        printf("\racc_raw x_h = 0x%2x, x_l = 0x%2x, y_h = 0x%2x, y_l = 0x%2x, z_h = 0x%2x, z_l = 0x%2x", acc_raw[1], acc_raw[0], acc_raw[3], acc_raw[2], acc_raw[5], acc_raw[4]);
+        // LSM303DLHC_Read(ACC_I2C_ADDRESS, LSM303DLHC_OUT_X_L_A, acc_raw, 6);
+        // printf("\racc_raw x_h = 0x%2x, x_l = 0x%2x, y_h = 0x%2x, y_l = 0x%2x, z_h = 0x%2x, z_l = 0x%2x ", acc_raw[1], acc_raw[0], acc_raw[3], acc_raw[2], acc_raw[5], acc_raw[4]);
         
         fflush(stdout);
     }
