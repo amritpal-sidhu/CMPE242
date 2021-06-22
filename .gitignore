@@ -8,6 +8,7 @@ __pycache__/
 *.o
 
 # Kernel module extensions
+*.ko
 *.cmd
 *.mod
 *.mod.c

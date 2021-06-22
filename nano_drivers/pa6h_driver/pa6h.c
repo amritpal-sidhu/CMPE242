@@ -5,6 +5,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdio.h>
 
 
 static int uart_fd;
@@ -18,6 +19,7 @@ int PA6H_jetson_nano_init(void) {
     int retval;
 
     if ((uart_fd = open(JETSON_NANO_LINUX_UART, O_RDWR)) < 0) {
+        printf("Error %i from open: %s\n", errno, strerror(errno));
         retval = -1;
     }
 
