@@ -16,7 +16,6 @@ static int i2c_fd = -1;
 /**
  * Function definitions
  */
-
 int ADS1015_jetson_nano_i2c_init(void) {
     int retval = 0;
     unsigned long func;
