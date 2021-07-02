@@ -48,13 +48,7 @@ int main() {
 		temp_dut = -1;
 		strcpy(temp_dir, "");
 		something_sent = 0;
-		/**
-		 * I check for each field, ignore other fields
-		 * 
-		 * Not the best solution since it requires multiple searching over already searched string.
-		 * Could keep a history of searched string like KMP & Aho-Corasick, but too lazy to implement that right now.
-		 * These strings are so short, improvment is negligible.
-		 */
+
 		if ((str_ptr=strstr(str_buf, "FRQ")) || (str_ptr=strstr(str_buf, "frq"))) {
 			
 			temp_frq = parse_number(str_ptr, 0);
