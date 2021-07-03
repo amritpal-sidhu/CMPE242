@@ -171,8 +171,11 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else
+        else {
             PA6H_write(packet_buf, strlen(packet_buf));
+            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
+            printf("SET_NMEA_UPDATERATE ACK: %s\n", packet_buf);
+        }
     }
 
     return retval;
@@ -189,8 +192,11 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else
+        else {
             PA6H_write(packet_buf, strlen(packet_buf));
+            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
+            printf("SET_NEMA_BAUDRATE ACK: %s\n", packet_buf);
+        }
     }
 
     return retval;
@@ -216,8 +222,12 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
                 char packet_buf1[MAX_PACKET_BUF_SIZE];
                 snprintf(packet_buf1, MAX_PACKET_BUF_SIZE, "$PMTK313,1*2E\r\n");
                 PA6H_write(packet_buf1, strlen(packet_buf1));
+                PA6H_read(packet_buf1, MAX_PACKET_BUF_SIZE);
+                printf("API_SET_SBAS_ENABLED ACK: %s\n", packet_buf1);
             }
             PA6H_write(packet_buf, strlen(packet_buf));
+            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
+            printf("API_SET_DGPS_MODE ACK: %s\n", packet_buf);
         }
     }
 
@@ -230,14 +240,18 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
     char packet_buf[MAX_PACKET_BUF_SIZE];
 
     if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK314,%i,%i,%i,%i,%i,%i,0,0,0,0,0,0,0,0,0,0,0,0,%i*", 
-    config.gll_output, config.rmc_output, config.vtg_output, config.gga_output, config.gsa_output, config.gsv_output, config.mchn_output) < 0) {
+    config.output_sentence.gll, config.output_sentence.rmc, config.output_sentence.vtg, config.output_sentence.gga,
+    config.output_sentence.gsa, config.output_sentence.gsv, config.output_sentence.mchn) < 0) {
         retval = -1;
     }
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else
+        else {
             PA6H_write(packet_buf, strlen(packet_buf));
+            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
+            printf("API_SET_NEMA_OUTPUT ACK: %s\n", packet_buf);
+        }
     }
 
     return retval;

@@ -27,16 +27,20 @@ typedef enum {
 } PA6H_output_freq;
 
 typedef struct {
+    PA6H_output_freq gll;
+    PA6H_output_freq rmc;
+    PA6H_output_freq vtg;
+    PA6H_output_freq gga;
+    PA6H_output_freq gsa;
+    PA6H_output_freq gsv;
+    PA6H_output_freq mchn;
+} PA6H_output_sen;
+
+typedef struct {
     unsigned baud_rate;             /* See accepted baud rates below */
     unsigned update_rate;           /* valid range is [100-10000] in ms */
     PA6H_dgps_mode dgps_mode;
-    PA6H_output_freq gll_output;
-    PA6H_output_freq rmc_output;
-    PA6H_output_freq vtg_output;
-    PA6H_output_freq gga_output;
-    PA6H_output_freq gsa_output;
-    PA6H_output_freq gsv_output;
-    PA6H_output_freq mchn_output;
+    PA6H_output_sen output_sentence;
     unsigned nav_speed_threshold;   /* See below for nav speed thresholds */
 } PAH6_config;
 
