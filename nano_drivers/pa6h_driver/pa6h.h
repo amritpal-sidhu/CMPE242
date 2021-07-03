@@ -6,7 +6,6 @@
  * registers.
  * 
  * @date Created: 2021-06-13
- *       Modified: 2021-07-01
  * @author Amritpal Sidhu
  */
 #pragma once
@@ -27,20 +26,18 @@ typedef enum {
 } PA6H_output_freq;
 
 typedef struct {
-    PA6H_output_freq gll;
-    PA6H_output_freq rmc;
-    PA6H_output_freq vtg;
-    PA6H_output_freq gga;
-    PA6H_output_freq gsa;
-    PA6H_output_freq gsv;
-    PA6H_output_freq mchn;
-} PA6H_output_sen;
-
-typedef struct {
     unsigned baud_rate;             /* See accepted baud rates below */
     unsigned update_rate;           /* valid range is [100-10000] in ms */
     PA6H_dgps_mode dgps_mode;
-    PA6H_output_sen output_sentence;
+    struct {
+        PA6H_output_freq gll;
+        PA6H_output_freq rmc;
+        PA6H_output_freq vtg;
+        PA6H_output_freq gga;
+        PA6H_output_freq gsa;
+        PA6H_output_freq gsv;
+        PA6H_output_freq mchn;
+    } output_sentence;
     unsigned nav_speed_threshold;   /* See below for nav speed thresholds */
 } PAH6_config;
 
