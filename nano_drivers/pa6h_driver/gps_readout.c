@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "pa6h.h"
 
@@ -46,6 +47,7 @@ int main(void) {
         PA6H_read(gps_data_buf, sizeof(gps_data_buf));
         printf("\r%s", gps_data_buf);
         fflush(stdout);
+        sleep(1);
     }
 
     printf("\nClosing serial port and terminating program\n");

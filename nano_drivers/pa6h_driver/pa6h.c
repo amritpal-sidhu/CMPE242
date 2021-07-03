@@ -15,7 +15,7 @@ static int uart_fd = -1;
 // static unsigned int bad_checksum_counter;
 
 
-static int linux_uart_set_baud(const unsigned baud_rate);
+// static int linux_uart_set_baud(const unsigned baud_rate);
 
 static int pmtk_set_nema_updaterate(const PAH6_config config);
 static int pmtk_set_nema_baudrate(const PAH6_config config);
@@ -75,7 +75,7 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
 
     pmtk_set_nema_updaterate(config_data);
     pmtk_set_nema_baudrate(config_data);
-    linux_uart_set_baud(config_data.baud_rate);
+    // linux_uart_set_baud(config_data.baud_rate);
     pmtk_api_set_dgps_mode(config_data);
     pmtk_api_set_nema_output(config_data);
 
@@ -100,6 +100,8 @@ void PA6H_jetson_nano_deinit(void) {
  *     $PMTK<ID>(,<VAR>)*<CHK><CR><LF>
  * 
  */
+
+/*
 static int linux_uart_set_baud(const unsigned baud_rate) {
 
     struct termios tty;
@@ -158,7 +160,7 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
 
 
     return retval;
-}
+} */
 
 static int pmtk_set_nema_updaterate(const PAH6_config config) {
 
@@ -171,11 +173,8 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else {
+        else
             PA6H_write(packet_buf, strlen(packet_buf));
-            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
-            printf("SET_NMEA_UPDATERATE ACK: %s\n", packet_buf);
-        }
     }
 
     return retval;
@@ -192,11 +191,8 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else {
+        else
             PA6H_write(packet_buf, strlen(packet_buf));
-            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
-            printf("SET_NEMA_BAUDRATE ACK: %s\n", packet_buf);
-        }
     }
 
     return retval;
@@ -222,12 +218,8 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
                 char packet_buf1[MAX_PACKET_BUF_SIZE];
                 snprintf(packet_buf1, MAX_PACKET_BUF_SIZE, "$PMTK313,1*2E\r\n");
                 PA6H_write(packet_buf1, strlen(packet_buf1));
-                PA6H_read(packet_buf1, MAX_PACKET_BUF_SIZE);
-                printf("API_SET_SBAS_ENABLED ACK: %s\n", packet_buf1);
             }
             PA6H_write(packet_buf, strlen(packet_buf));
-            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
-            printf("API_SET_DGPS_MODE ACK: %s\n", packet_buf);
         }
     }
 
@@ -247,11 +239,8 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
     else {
         if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
             retval = -1;
-        else {
+        else
             PA6H_write(packet_buf, strlen(packet_buf));
-            PA6H_read(packet_buf, MAX_PACKET_BUF_SIZE);
-            printf("API_SET_NEMA_OUTPUT ACK: %s\n", packet_buf);
-        }
     }
 
     return retval;
