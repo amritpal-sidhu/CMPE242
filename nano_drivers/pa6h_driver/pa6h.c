@@ -168,8 +168,6 @@ void PA6H_jetson_nano_deinit(void) {
         }
     }
 
-
-
     return retval;
 } */
 
@@ -187,6 +185,8 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
         if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else {
+
+            printf("DEBUG SET UPDATERATE TX:  %s\n", tx_buf);
             
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
@@ -216,6 +216,8 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
             retval = -1;
         else{
 
+            printf("DEBUG SET BAUDRATE TX:  %s\n", tx_buf);
+
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
@@ -240,6 +242,8 @@ static int pmtk_api_set_sbas_enabled(void) {
         retval = -1;
     else {
 
+        printf("DEBUG SBAS ENABLED TX:  %s\n", tx_buf);
+
         do {
             PA6H_write(tx_buf, strlen(tx_buf));
             PA6H_read(rx_buf, sizeof(rx_buf));
@@ -252,9 +256,6 @@ static int pmtk_api_set_sbas_enabled(void) {
     return retval;
 }
 
-/**
- * For WAAS, pmtk_api_set_sbas_enabled should be asserted
- */
 static int pmtk_api_set_dgps_mode(const PAH6_config config) {
 
     int retval = 0;
@@ -273,6 +274,8 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
             if (config.dgps_mode == WAAS_DGPS)
                 pmtk_api_set_sbas_enabled();
             
+            printf("DEBUG SET DGPS MODE TX:  %s\n", tx_buf);
+
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
@@ -302,6 +305,8 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
         if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else {
+
+            printf("DEBUG SET OUTPUT TX:  %s\n", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
