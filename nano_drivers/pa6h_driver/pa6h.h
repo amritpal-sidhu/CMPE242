@@ -67,13 +67,13 @@ typedef struct {
  * NAV Speed Thresholds
  */
 #define PA6H_NAV_SPEED_THRESH_DISABLE   0
-#define PA6H_NAV_SPEED_THRESH_0_2       0.2f
-#define PA6H_NAV_SPEED_THRESH_0_4       0.4f
-#define PA6H_NAV_SPEED_THRESH_0_6       0.6f
-#define PA6H_NAV_SPEED_THRESH_0_8       0.8f
-#define PA6H_NAV_SPEED_THRESH_1_0       1.0f
-#define PA6H_NAV_SPEED_THRESH_1_5       1.5f
-#define PA6H_NAV_SPEED_THRESH_2_0       2.0f
+#define PA6H_NAV_SPEED_THRESH_0_2_MPS   0.2f
+#define PA6H_NAV_SPEED_THRESH_0_4_MPS   0.4f
+#define PA6H_NAV_SPEED_THRESH_0_6_MPS   0.6f
+#define PA6H_NAV_SPEED_THRESH_0_8_MPS   0.8f
+#define PA6H_NAV_SPEED_THRESH_1_0_MPS   1.0f
+#define PA6H_NAV_SPEED_THRESH_1_5_MPS   1.5f
+#define PA6H_NAV_SPEED_THRESH_2_0_MPS   2.0f
 
 
 int PA6H_jetson_nano_init(const PAH6_config config_data);

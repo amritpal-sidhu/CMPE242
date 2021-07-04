@@ -6,6 +6,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <time.h>
 
 #define MAX_PACKET_BUF_SIZE     256
 
@@ -17,11 +18,17 @@ static int uart_fd = -1;
 
 static int linux_uart_set_baud(const unsigned baud_rate);
 
-static int pmtk_set_nema_updaterate(const PAH6_config config);
-static int pmtk_set_nema_baudrate(const PAH6_config config);
-static int pmtk_api_set_sbas_enabled(void);
-static int pmtk_api_set_dgps_mode(const PAH6_config config);
-static int pmtk_api_set_nema_output(const PAH6_config config);
+static int PA6H_set_updaterate(const PAH6_config config);
+static int PA6H_set_baudrate(const PAH6_config config);
+
+static int PA6H_set_sbas_enabled(void);
+static void PA6H_query_sbas_enabled(void);
+
+static int PA6H_set_dgps_mode(const PAH6_config config);
+static void PA6H_query_dgps_mode(void);
+
+static int PA6H_set_output(const PAH6_config config);
+static void PA6H_query_output(void);
 
 static unsigned nema_checksum(const char *nema_packet);
 
@@ -74,11 +81,15 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
         }
     }
 
-    // pmtk_set_nema_baudrate(config_data);
+    PA6H_query_sbas_enabled();
+    PA6H_query_dgps_mode();
+    PA6H_query_output();
+
+    // PA6H_set_baudrate(config_data);
     // linux_uart_set_baud(config_data.baud_rate);
-    pmtk_set_nema_updaterate(config_data);
-    pmtk_api_set_dgps_mode(config_data);
-    pmtk_api_set_nema_output(config_data);
+    PA6H_set_updaterate(config_data);
+    PA6H_set_dgps_mode(config_data);
+    PA6H_set_output(config_data);
 
     return retval;
 }
@@ -169,7 +180,7 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
     return retval;
 }
 
-static int pmtk_set_nema_updaterate(const PAH6_config config) {
+static int PA6H_set_updaterate(const PAH6_config config) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -183,6 +194,7 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
         if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else {
+            const clock_t begin_time = clock();
 
             printf("DEBUG SET UPDATERATE TX:  %s", tx_buf);
             
@@ -193,13 +205,15 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
                     printf("DEBUG SET UPDATERATE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            printf("DEBUG SET UPDATERATE:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
         }
     }
 
     return retval;
 }
 
-static int pmtk_set_nema_baudrate(const PAH6_config config) {
+static int PA6H_set_baudrate(const PAH6_config config) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -213,6 +227,7 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
         if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else{
+            const clock_t begin_time = clock();
 
             printf("DEBUG SET BAUDRATE TX:  %s", tx_buf);
 
@@ -223,13 +238,15 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
                     printf("DEBUG SET BAUDRATE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            printf("DEBUG SET BAUDRATE:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
         }
     }
 
     return retval;
 }
 
-static int pmtk_api_set_sbas_enabled(void) {
+static int PA6H_set_sbas_enabled(void) {
     
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -239,6 +256,7 @@ static int pmtk_api_set_sbas_enabled(void) {
     if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK313,1*2E\r\n") < 0)
         retval = -1;
     else {
+        const clock_t begin_time = clock();
 
         printf("DEBUG SBAS ENABLED TX:  %s", tx_buf);
 
@@ -249,12 +267,33 @@ static int pmtk_api_set_sbas_enabled(void) {
                 printf("DEBUG SBAS ENABLED RX:  %s\n", rx_buf);
 
         } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+        printf("DEBUG SBAS ENABLED:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
     }
     
     return retval;
 }
 
-static int pmtk_api_set_dgps_mode(const PAH6_config config) {
+static void PA6H_query_sbas_enabled(void) {
+
+    char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK413*34\r\n";
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char reply_header[32] = "$PMTK513";
+    const clock_t begin_time = clock();
+
+    printf("DEBUG QUERY SBAS ENABLED TX:  %s", tx_buf);
+
+    PA6H_write(tx_buf, strlen(tx_buf));
+
+    do {
+        PA6H_read(rx_buf, sizeof(rx_buf));
+    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("DEBUG QUERY SBAS ENABLED RX:  %s\n", rx_buf);
+    printf("DEBUG QUERY SBAS ENABLED:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
+}
+
+static int PA6H_set_dgps_mode(const PAH6_config config) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -270,7 +309,9 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
         else {
             /* SBAS needs to be enabled when WAAS is used */
             if (config.dgps_mode == WAAS_DGPS)
-                pmtk_api_set_sbas_enabled();
+                PA6H_set_sbas_enabled();
+            
+            const clock_t begin_time = clock();
             
             printf("DEBUG SET DGPS MODE TX:  %s", tx_buf);
 
@@ -281,13 +322,34 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
                     printf("DEBUG SET DGPS MODE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            printf("DEBUG SET DGPS MODE:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
         }
     }
 
     return retval;
 }
 
-static int pmtk_api_set_nema_output(const PAH6_config config) {
+static void PA6H_query_dgps_mode(void) {
+
+    char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK401*37\r\n";
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char reply_header[32] = "$PMTK501";
+    const clock_t begin_time = clock();
+
+    printf("DEBUG QUERY SET DGPS MODE TX:  %s", tx_buf);
+
+    PA6H_write(tx_buf, strlen(tx_buf));
+
+    do {
+        PA6H_read(rx_buf, sizeof(rx_buf));
+    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("DEBUG QUERY SET DGPS MODE RX:  %s\n", rx_buf);
+    printf("DEBUG QUERY SET DGPS MODE:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
+}
+
+static int PA6H_set_output(const PAH6_config config) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -303,6 +365,7 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
         if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else {
+            const clock_t begin_time = clock();
 
             printf("DEBUG SET OUTPUT TX:  %s", tx_buf);
 
@@ -313,10 +376,31 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
                     printf("DEBUG SET OUTPUT RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            printf("DEBUG SET OUTPUT:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
         }
     }
 
     return retval;
+}
+
+static void PA6H_query_output(void) {
+
+    char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK414*33\r\n";
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char reply_header[32] = "$PMTK514";
+    const clock_t begin_time = clock();
+
+    printf("DEBUG QUERY OUTPUT TX:  %s", tx_buf);
+
+    PA6H_write(tx_buf, strlen(tx_buf));
+
+    do {
+        PA6H_read(rx_buf, sizeof(rx_buf));
+    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("DEBUG QUERY OUTPUT RX:  %s\n", rx_buf);
+    printf("DEBUG QUERY OUTPUT:  It took %0.3f seconds for an ACK\n", ((float)clock() - begin_time)/CLOCKS_PER_SEC);
 }
 
 static unsigned nema_checksum(const char *nema_packet) {
