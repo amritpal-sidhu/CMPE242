@@ -15,7 +15,7 @@ static int uart_fd = -1;
 // static unsigned int bad_checksum_counter;
 
 
-// static int linux_uart_set_baud(const unsigned baud_rate);
+static int linux_uart_set_baud(const unsigned baud_rate);
 
 static int pmtk_set_nema_updaterate(const PAH6_config config);
 static int pmtk_set_nema_baudrate(const PAH6_config config);
@@ -74,7 +74,7 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
         }
     }
 
-    pmtk_set_nema_baudrate(config_data);
+    // pmtk_set_nema_baudrate(config_data);
     // linux_uart_set_baud(config_data.baud_rate);
     pmtk_set_nema_updaterate(config_data);
     pmtk_api_set_dgps_mode(config_data);
@@ -108,12 +108,10 @@ void PA6H_jetson_nano_deinit(void) {
 }
 
 /**
- * PMTK command packet format:
- *     $PMTK<ID>(,<VAR>)*<CHK><CR><LF>
- * 
+ * Private local function definitions below
  */
 
-/* static int linux_uart_set_baud(const unsigned baud_rate) {
+static int linux_uart_set_baud(const unsigned baud_rate) {
 
     struct termios tty;
     int retval;
@@ -169,7 +167,7 @@ void PA6H_jetson_nano_deinit(void) {
     }
 
     return retval;
-} */
+}
 
 static int pmtk_set_nema_updaterate(const PAH6_config config) {
 
@@ -186,7 +184,7 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
             retval = -1;
         else {
 
-            printf("DEBUG SET UPDATERATE TX:  %s\n", tx_buf);
+            printf("DEBUG SET UPDATERATE TX:  %s", tx_buf);
             
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
@@ -216,7 +214,7 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
             retval = -1;
         else{
 
-            printf("DEBUG SET BAUDRATE TX:  %s\n", tx_buf);
+            printf("DEBUG SET BAUDRATE TX:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
@@ -242,7 +240,7 @@ static int pmtk_api_set_sbas_enabled(void) {
         retval = -1;
     else {
 
-        printf("DEBUG SBAS ENABLED TX:  %s\n", tx_buf);
+        printf("DEBUG SBAS ENABLED TX:  %s", tx_buf);
 
         do {
             PA6H_write(tx_buf, strlen(tx_buf));
@@ -274,7 +272,7 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
             if (config.dgps_mode == WAAS_DGPS)
                 pmtk_api_set_sbas_enabled();
             
-            printf("DEBUG SET DGPS MODE TX:  %s\n", tx_buf);
+            printf("DEBUG SET DGPS MODE TX:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
@@ -306,7 +304,7 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
             retval = -1;
         else {
 
-            printf("DEBUG SET OUTPUT TX:  %s\n", tx_buf);
+            printf("DEBUG SET OUTPUT TX:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));

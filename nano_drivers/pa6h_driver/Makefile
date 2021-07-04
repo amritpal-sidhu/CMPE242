@@ -1,5 +1,5 @@
 CXX = $(CROSS_COMPILE)gcc
-CXXFLAGS = -c -g -Wall -W -Werror -pedantic
+CXXFLAGS = -c -g -Wall -W #-Werror -pedantic
 LDFLAGS = 
 
 gps_readout: gps_readout.o pa6h.o
