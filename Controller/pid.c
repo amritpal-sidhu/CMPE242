@@ -5,17 +5,17 @@
 // sqrt(2*pi) rounded to 6 sig figs.
 static const float sqrt_2pi = 2.506628f;
 
-float derivative_c(float e0, float e2) {
+float central_diff(float e0, float e2) {
 
     return (e0 - e2) / 2; // Multiply by some time unit?
 }
 
-float derivative_f(float e0, float e1) {
+float forward_diff(float e0, float e1) {
 
     return (e0 - e1) / 1;
 }
 
-float derivative_b(float e1, float e2){
+float backward_diff(float e1, float e2){
 
     return (e1 - e2) / 1;
 }

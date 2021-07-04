@@ -26,13 +26,13 @@ int main(void) {
     gps_config.baud_rate = PA6H_BAUD_9600;
     gps_config.update_rate = 1000;
     gps_config.dgps_mode = WAAS_DGPS;
-    gps_config.output_sentence.gll = DISABLE_OUTPUT;
-    gps_config.output_sentence.rmc = DISABLE_OUTPUT;
-    gps_config.output_sentence.vtg = DISABLE_OUTPUT;
-    gps_config.output_sentence.gga = ONCE_EVERY_FIX;
-    gps_config.output_sentence.gsa = DISABLE_OUTPUT;
-    gps_config.output_sentence.gsv = DISABLE_OUTPUT;
-    gps_config.output_sentence.mchn = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.gll = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.rmc = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.vtg = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.gga = ONCE_EVERY_FIX;
+    gps_config.sen_output_rates.gsa = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.gsv = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.mchn = DISABLE_OUTPUT;
     gps_config.nav_speed_threshold = PA6H_NAV_SPEED_THRESH_DISABLE;
 
     if (PA6H_jetson_nano_init(gps_config) == -1) {

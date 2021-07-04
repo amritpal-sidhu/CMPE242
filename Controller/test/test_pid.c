@@ -6,9 +6,9 @@
 static void test_derivatives(float e0, float e1, float e2, float std) {
     
     printf("TESTING derivatives with [%0.1f, %0.1f, %0.1f] and std = %0.1f\n", e2, e1, e0, std);
-    printf("central: %0.3f\n", derivative_c(e0, e2));
-    printf("forward: %0.3f\n", derivative_f(e0, e1));
-    printf("backward: %0.3f\n", derivative_b(e1, e2));
+    printf("central: %0.3f\n", central_diff(e0, e2));
+    printf("forward: %0.3f\n", forward_diff(e0, e1));
+    printf("backward: %0.3f\n", backward_diff(e1, e2));
     printf("LoG: %0.3f\n\n", derivative_LoG(e0, e2, std));
 }
 

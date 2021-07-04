@@ -37,7 +37,7 @@ typedef struct {
         PA6H_output_freq gsa;
         PA6H_output_freq gsv;
         PA6H_output_freq mchn;
-    } output_sentence;
+    } sen_output_rates;
     unsigned nav_speed_threshold;   /* See below for nav speed thresholds */
 } PAH6_config;
 

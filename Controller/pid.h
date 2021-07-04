@@ -1,10 +1,5 @@
 #pragma once
 
-// TODO: set up interrupt to sample sensor
-// TODO: copy queue code from 243 and just use that as the history_buffer
-// const unsigned buffer_size = 6;
-// float history_buffer[buffer_size] = {0}; // the 0th entry is the current sample
-
 /**
  * @brief  Use the centeral difference to compute
  *         the derivative.
@@ -12,7 +7,7 @@
  * @param  e2: sample from 2 sample periods ago
  * @retval Value of the derivative.
  */
-float derivative_c(float e0, float e2);
+float central_diff(float e0, float e2);
 
 /**
  * @brief  Use the centeral difference to compute
@@ -21,7 +16,7 @@ float derivative_c(float e0, float e2);
  * @param  e1: sample from 1 sample period ago
  * @retval Value of the derivative.
  */
-float derivative_f(float e0, float e1);
+float forward_diff(float e0, float e1);
 
 /**
  * @brief  Use the centeral difference to compute
@@ -30,7 +25,7 @@ float derivative_f(float e0, float e1);
  * @param  e2: sample from 2 sample periods ago
  * @retval Value of the derivative.
  */
-float derivative_b(float e1, float e2);
+float backward_diff(float e1, float e2);
 
 /**
  * @brief  Use the centeral difference to compute

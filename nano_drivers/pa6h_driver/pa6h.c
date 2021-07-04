@@ -232,8 +232,8 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
     char packet_buf[MAX_PACKET_BUF_SIZE];
 
     if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK314,%i,%i,%i,%i,%i,%i,0,0,0,0,0,0,0,0,0,0,0,0,%i*", 
-    config.output_sentence.gll, config.output_sentence.rmc, config.output_sentence.vtg, config.output_sentence.gga,
-    config.output_sentence.gsa, config.output_sentence.gsv, config.output_sentence.mchn) < 0) {
+    config.sen_output_rates.gll, config.sen_output_rates.rmc, config.sen_output_rates.vtg, config.sen_output_rates.gga,
+    config.sen_output_rates.gsa, config.sen_output_rates.gsv, config.sen_output_rates.mchn) < 0) {
         retval = -1;
     }
     else {
