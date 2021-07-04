@@ -83,7 +83,18 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
 }
 
 int PA6H_read(char *buf, const int buf_size) {
-    return read(uart_fd, buf, buf_size*sizeof(char));
+    int retval;
+    char byte_buf;
+    int write_i = 0;
+
+    while (write_i < buf_size-1 && (retval=read(uart_fd, &byte_buf, sizeof(char))) > 0 && byte_buf != '\n') {
+
+        buf[write_i++] = byte_buf;
+    }
+
+    buf[write_i] = '\0';
+
+    return retval;
 }
 
 int PA6H_write(const char *buf, const int buf_size) {
