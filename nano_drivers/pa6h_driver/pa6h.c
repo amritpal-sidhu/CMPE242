@@ -19,6 +19,7 @@ static int uart_fd = -1;
 
 static int pmtk_set_nema_updaterate(const PAH6_config config);
 static int pmtk_set_nema_baudrate(const PAH6_config config);
+static int pmtk_api_set_sbas_enabled(void);
 static int pmtk_api_set_dgps_mode(const PAH6_config config);
 static int pmtk_api_set_nema_output(const PAH6_config config);
 
@@ -176,16 +177,25 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
 static int pmtk_set_nema_updaterate(const PAH6_config config) {
 
     int retval = 0;
-    char packet_buf[MAX_PACKET_BUF_SIZE];
+    char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char ack_msg[32] = "$PMTK001,220,3";
 
-    if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK220,%i*", config.update_rate) < 0) {
+    if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK220,%i*", config.update_rate) < 0) {
         retval = -1;
     }
     else {
-        if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
+        if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
-        else
-            PA6H_write(packet_buf, strlen(packet_buf));
+        else {
+            
+            do {
+                PA6H_write(tx_buf, strlen(tx_buf));
+                PA6H_read(rx_buf, sizeof(rx_buf));
+                printf("DEBUG SET UPDATERATE RX:  %s\n", rx_buf);
+
+            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+        }
     }
 
     return retval;
@@ -194,18 +204,49 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
 static int pmtk_set_nema_baudrate(const PAH6_config config) {
 
     int retval = 0;
-    char packet_buf[MAX_PACKET_BUF_SIZE];
+    char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char ack_msg[32] = "$PMTK001,251,3";
 
-    if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK251,%i*", config.baud_rate) < 0) {
+    if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK251,%i*", config.baud_rate) < 0) {
         retval = -1;
     }
     else {
-        if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
+        if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
-        else
-            PA6H_write(packet_buf, strlen(packet_buf));
+        else{
+
+            do {
+                PA6H_write(tx_buf, strlen(tx_buf));
+                PA6H_read(rx_buf, sizeof(rx_buf));
+                printf("DEBUG SET BAUDRATE RX:  %s\n", rx_buf);
+
+            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+        }
     }
 
+    return retval;
+}
+
+static int pmtk_api_set_sbas_enabled(void) {
+    
+    int retval = 0;
+    char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char ack_msg[32] = "$PMTK001,313,3";
+    
+    if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK313,1*2E\r\n") < 0)
+        retval = -1;
+    else {
+
+        do {
+            PA6H_write(tx_buf, strlen(tx_buf));
+            PA6H_read(rx_buf, sizeof(rx_buf));
+            printf("DEBUG SBAS ENABLED RX:  %s\n", rx_buf);
+
+        } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+    }
+    
     return retval;
 }
 
@@ -215,22 +256,27 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
 static int pmtk_api_set_dgps_mode(const PAH6_config config) {
 
     int retval = 0;
-    char packet_buf[MAX_PACKET_BUF_SIZE];
+    char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char ack_msg[32] = "$PMTK001,301,3";
 
-    if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK301,%i*", config.dgps_mode) < 0) {
+    if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK301,%i*", config.dgps_mode) < 0) {
         retval = -1;
     }
     else {
-        if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
+        if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
         else {
             /* SBAS needs to be enabled when WAAS is used */
-            if (config.dgps_mode == WAAS_DGPS) {
-                char packet_buf1[MAX_PACKET_BUF_SIZE];
-                snprintf(packet_buf1, MAX_PACKET_BUF_SIZE, "$PMTK313,1*2E\r\n");
-                PA6H_write(packet_buf1, strlen(packet_buf1));
-            }
-            PA6H_write(packet_buf, strlen(packet_buf));
+            if (config.dgps_mode == WAAS_DGPS)
+                pmtk_api_set_sbas_enabled();
+            
+            do {
+                PA6H_write(tx_buf, strlen(tx_buf));
+                PA6H_read(rx_buf, sizeof(rx_buf));
+                printf("DEBUG SET DGPS MODE RX:  %s\n", rx_buf);
+
+            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
         }
     }
 
@@ -240,18 +286,27 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
 static int pmtk_api_set_nema_output(const PAH6_config config) {
 
     int retval = 0;
-    char packet_buf[MAX_PACKET_BUF_SIZE];
+    char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
+    char ack_msg[32] = "$PMTK001,314,3";
 
-    if (snprintf(packet_buf, MAX_PACKET_BUF_SIZE, "$PMTK314,%i,%i,%i,%i,%i,%i,0,0,0,0,0,0,0,0,0,0,0,0,%i*", 
+    if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK314,%i,%i,%i,%i,%i,%i,0,0,0,0,0,0,0,0,0,0,0,0,%i*", 
     config.sen_output_rates.gll, config.sen_output_rates.rmc, config.sen_output_rates.vtg, config.sen_output_rates.gga,
     config.sen_output_rates.gsa, config.sen_output_rates.gsv, config.sen_output_rates.mchn) < 0) {
         retval = -1;
     }
     else {
-        if (snprintf(packet_buf+strlen(packet_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(packet_buf)) < 0)
+        if (snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0)
             retval = -1;
-        else
-            PA6H_write(packet_buf, strlen(packet_buf));
+        else {
+
+            do {
+                PA6H_write(tx_buf, strlen(tx_buf));
+                PA6H_read(rx_buf, sizeof(rx_buf));
+                printf("DEBUG SET OUTPUT RX:  %s\n", rx_buf);
+
+            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+        }
     }
 
     return retval;
