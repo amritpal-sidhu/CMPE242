@@ -74,9 +74,9 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
         }
     }
 
-    pmtk_set_nema_updaterate(config_data);
     pmtk_set_nema_baudrate(config_data);
     // linux_uart_set_baud(config_data.baud_rate);
+    pmtk_set_nema_updaterate(config_data);
     pmtk_api_set_dgps_mode(config_data);
     pmtk_api_set_nema_output(config_data);
 
@@ -113,8 +113,7 @@ void PA6H_jetson_nano_deinit(void) {
  * 
  */
 
-/*
-static int linux_uart_set_baud(const unsigned baud_rate) {
+/* static int linux_uart_set_baud(const unsigned baud_rate) {
 
     struct termios tty;
     int retval;
@@ -192,7 +191,8 @@ static int pmtk_set_nema_updaterate(const PAH6_config config) {
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
-                printf("DEBUG SET UPDATERATE RX:  %s\n", rx_buf);
+                if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                    printf("DEBUG SET UPDATERATE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
         }
@@ -219,7 +219,8 @@ static int pmtk_set_nema_baudrate(const PAH6_config config) {
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
-                printf("DEBUG SET BAUDRATE RX:  %s\n", rx_buf);
+                if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                    printf("DEBUG SET BAUDRATE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
         }
@@ -242,7 +243,8 @@ static int pmtk_api_set_sbas_enabled(void) {
         do {
             PA6H_write(tx_buf, strlen(tx_buf));
             PA6H_read(rx_buf, sizeof(rx_buf));
-            printf("DEBUG SBAS ENABLED RX:  %s\n", rx_buf);
+            if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                printf("DEBUG SBAS ENABLED RX:  %s\n", rx_buf);
 
         } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
     }
@@ -274,7 +276,8 @@ static int pmtk_api_set_dgps_mode(const PAH6_config config) {
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
-                printf("DEBUG SET DGPS MODE RX:  %s\n", rx_buf);
+                if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                    printf("DEBUG SET DGPS MODE RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
         }
@@ -303,7 +306,8 @@ static int pmtk_api_set_nema_output(const PAH6_config config) {
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
-                printf("DEBUG SET OUTPUT RX:  %s\n", rx_buf);
+                if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                    printf("DEBUG SET OUTPUT RX:  %s\n", rx_buf);
 
             } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
         }
