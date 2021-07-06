@@ -79,5 +79,4 @@ typedef struct {
 int PA6H_jetson_nano_init(const PAH6_config config_data);
 void PA6H_jetson_nano_deinit(void);
 
-int PA6H_read(char *buf, const int buf_size);
-int PA6H_write(const char *buf, const int buf_size);
+void PA6H_read_GP_sentence(char *buf, const int buf_size);

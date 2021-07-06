@@ -45,9 +45,8 @@ int main(void) {
 
     while (!stop_signal) {
 
-        PA6H_read(gps_data_buf, sizeof(gps_data_buf));
-        if (strncmp(gps_data_buf, "$PMTK", 5*sizeof(char)))
-            printf("%s\n", gps_data_buf);
+        PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf));
+        printf("%s\n", gps_data_buf);
         fflush(stdout);
         sleep(1);
     }

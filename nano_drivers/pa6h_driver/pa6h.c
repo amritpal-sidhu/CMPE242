@@ -19,6 +19,9 @@ static unsigned previous_baud_rate = PA6H_BAUD_9600;
 
 static int linux_uart_set_baud(const unsigned baud_rate);
 
+static int PA6H_read_sentence(char *buf, const int buf_size);
+static int PA6H_write_sentence(const char *buf, const int buf_size);
+
 static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_ms);
 static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms);
 
@@ -94,28 +97,16 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
     return retval;
 }
 
-int PA6H_read(char *buf, const int buf_size) {
-    int retval;
-    char byte_buf;
-    int write_i = 0;
-
-    while (write_i < buf_size-1 && (retval=read(uart_fd, &byte_buf, sizeof(char))) > 0 && byte_buf != '\n') {
-
-        buf[write_i++] = byte_buf;
-    }
-
-    buf[write_i] = '\0';
-
-    return retval;
-}
-
-int PA6H_write(const char *buf, const int buf_size) {
-    return write(uart_fd, buf, buf_size*sizeof(char));
-}
-
 void PA6H_jetson_nano_deinit(void) {
     
     close(uart_fd);
+}
+
+void PA6H_read_GP_sentence(char *buf, const int buf_size) {
+
+    char GP_header[8] = "$GP";
+
+    while (PA6H_read_sentence(buf, buf_size) && strncmp(buf, GP_header, strlen(GP_header)));
 }
 
 /**
@@ -180,6 +171,25 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
     return retval;
 }
 
+int PA6H_read_sentence(char *buf, const int buf_size) {
+    int retval;
+    char byte_buf;
+    int write_i = 0;
+
+    while (write_i < buf_size-1 && (retval=read(uart_fd, &byte_buf, sizeof(char))) > 0 && byte_buf != '\n') {
+
+        buf[write_i++] = byte_buf;
+    }
+
+    buf[write_i] = '\0';
+
+    return retval;
+}
+
+int PA6H_write_sentence(const char *buf, const int buf_size) {
+    return write(uart_fd, buf, buf_size*sizeof(char));
+}
+
 static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_ms) {
 
     int retval = 0;
@@ -198,8 +208,8 @@ static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_
         printf("TX SET UPDATERATE MSG:  %s", tx_buf);
         
         do {
-            PA6H_write(tx_buf, strlen(tx_buf));
-            PA6H_read(rx_buf, sizeof(rx_buf));
+            PA6H_write_sentence(tx_buf, strlen(tx_buf));
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
                 printf("RX SET UPDATERATE MSG:  %s\n", rx_buf);
 
@@ -236,9 +246,9 @@ static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms
 
         do {
             linux_uart_set_baud(previous_baud_rate); // revert back to previous baud rate
-            PA6H_write(tx_buf, strlen(tx_buf));
+            PA6H_write_sentence(tx_buf, strlen(tx_buf));
             linux_uart_set_baud(config.baud_rate);
-            PA6H_read(rx_buf, sizeof(rx_buf));
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
                 printf("RX SET BAUDRATE MSG:  %s\n", rx_buf);
 
@@ -274,8 +284,8 @@ static int PA6H_set_sbas_enabled(const unsigned timeout_ms) {
         printf("TX SBAS ENABLED MSG:  %s", tx_buf);
 
         do {
-            PA6H_write(tx_buf, strlen(tx_buf));
-            PA6H_read(rx_buf, sizeof(rx_buf));
+            PA6H_write_sentence(tx_buf, strlen(tx_buf));
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
                 printf("RX SBAS ENABLED MSG:  %s\n", rx_buf);
 
@@ -305,8 +315,8 @@ static int PA6H_query_sbas_enabled(const unsigned timeout_ms) {
     printf("TX QUERY SBAS ENABLED MSG:  %s", tx_buf);
 
     do {
-        PA6H_write(tx_buf, strlen(tx_buf));
-        PA6H_read(rx_buf, sizeof(rx_buf));
+        PA6H_write_sentence(tx_buf, strlen(tx_buf));
+        PA6H_read_sentence(rx_buf, sizeof(rx_buf));
         if (timeout_ms && clock() >= end_time)
             retval = ETIMEDOUT;
 
@@ -343,8 +353,8 @@ static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_m
         printf("TX SET DGPS MODE MSG:  %s", tx_buf);
 
         do {
-            PA6H_write(tx_buf, strlen(tx_buf));
-            PA6H_read(rx_buf, sizeof(rx_buf));
+            PA6H_write_sentence(tx_buf, strlen(tx_buf));
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
                 printf("RX SET DGPS MODE MSG:  %s\n", rx_buf);
 
@@ -374,8 +384,8 @@ static int PA6H_query_dgps_mode(const unsigned timeout_ms) {
     printf("TX QUERY SET DGPS MODE MSG:  %s", tx_buf);
 
     do {
-        PA6H_write(tx_buf, strlen(tx_buf));
-        PA6H_read(rx_buf, sizeof(rx_buf));
+        PA6H_write_sentence(tx_buf, strlen(tx_buf));
+        PA6H_read_sentence(rx_buf, sizeof(rx_buf));
         if (timeout_ms && clock() >= end_time)
             retval = ETIMEDOUT;
 
@@ -410,8 +420,8 @@ static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms) 
         printf("TX SET OUTPUT MSG:  %s", tx_buf);
 
         do {
-            PA6H_write(tx_buf, strlen(tx_buf));
-            PA6H_read(rx_buf, sizeof(rx_buf));
+            PA6H_write_sentence(tx_buf, strlen(tx_buf));
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
                 printf("RX SET OUTPUT MSG:  %s\n", rx_buf);
 
@@ -441,8 +451,8 @@ static int PA6H_query_output(const unsigned timeout_ms) {
     printf("TX QUERY OUTPUT MSG:  %s", tx_buf);
 
     do {
-        PA6H_write(tx_buf, strlen(tx_buf));
-        PA6H_read(rx_buf, sizeof(rx_buf));
+        PA6H_write_sentence(tx_buf, strlen(tx_buf));
+        PA6H_read_sentence(rx_buf, sizeof(rx_buf));
         if (timeout_ms && clock() >= end_time)
             retval = ETIMEDOUT;
 
