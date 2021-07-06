@@ -18,17 +18,17 @@ static int uart_fd = -1;
 
 static int linux_uart_set_baud(const unsigned baud_rate);
 
-static int PA6H_set_updaterate(const PAH6_config config);
-static int PA6H_set_baudrate(const PAH6_config config);
+static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_ms);
+static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms);
 
-static int PA6H_set_sbas_enabled(void);
-static void PA6H_query_sbas_enabled(void);
+static int PA6H_set_sbas_enabled(const unsigned timeout_ms);
+static int PA6H_query_sbas_enabled(const unsigned timeout_ms);
 
-static int PA6H_set_dgps_mode(const PAH6_config config);
-static void PA6H_query_dgps_mode(void);
+static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_ms);
+static int PA6H_query_dgps_mode(const unsigned timeout_ms);
 
-static int PA6H_set_output(const PAH6_config config);
-static void PA6H_query_output(void);
+static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms);
+static int PA6H_query_output(const unsigned timeout_ms);
 
 static unsigned nema_checksum(const char *nema_packet);
 
@@ -81,15 +81,15 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
         }
     }
 
-    // PA6H_query_sbas_enabled();
-    // PA6H_query_dgps_mode();
-    // PA6H_query_output();
+    PA6H_query_sbas_enabled(5000);
+    PA6H_query_dgps_mode(5000);
+    PA6H_query_output(5000);
 
-    // PA6H_set_baudrate(config_data);
-    // linux_uart_set_baud(config_data.baud_rate);
-    // PA6H_set_updaterate(config_data);
-    PA6H_set_dgps_mode(config_data);
-    PA6H_set_output(config_data);
+    if (!PA6H_set_baudrate(config_data, 5000))
+        linux_uart_set_baud(config_data.baud_rate);
+    PA6H_set_updaterate(config_data, 5000);
+    PA6H_set_dgps_mode(config_data, 5000);
+    PA6H_set_output(config_data, 5000);
 
     return retval;
 }
@@ -180,7 +180,7 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
     return retval;
 }
 
-static int PA6H_set_updaterate(const PAH6_config config) {
+static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_ms) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -196,24 +196,30 @@ static int PA6H_set_updaterate(const PAH6_config config) {
         else {
             const clock_t begin_time = clock();
 
-            printf("DEBUG SET UPDATERATE TX:  %s", tx_buf);
+            printf("TX SET UPDATERATE MSG:  %s", tx_buf);
             
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
                 if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                    printf("DEBUG SET UPDATERATE RX:  %s\n", rx_buf);
+                    printf("RX SET UPDATERATE MSG:  %s\n", rx_buf);
 
-            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+                if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+                    retval = ETIMEDOUT;
 
-            printf("DEBUG SET UPDATERATE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            if (!retval)
+                printf("SET UPDATERATE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            else
+                printf("SET UPDATERATE:  Timeout of %i milliseconds reached\n", timeout_ms);
         }
     }
 
     return retval;
 }
 
-static int PA6H_set_baudrate(const PAH6_config config) {
+static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -229,24 +235,30 @@ static int PA6H_set_baudrate(const PAH6_config config) {
         else{
             const clock_t begin_time = clock();
 
-            printf("DEBUG SET BAUDRATE TX:  %s", tx_buf);
+            printf("TX SET BAUDRATE MSG:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
                 if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                    printf("DEBUG SET BAUDRATE RX:  %s\n", rx_buf);
+                    printf("RX SET BAUDRATE MSG:  %s\n", rx_buf);
 
-            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+                if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+                    retval = ETIMEDOUT;
 
-            printf("DEBUG SET BAUDRATE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            if (!retval)
+                printf("SET BAUDRATE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            else
+                printf("SET BAUDRATE:  Timeout of %i milliseconds reached\n", timeout_ms);
         }
     }
 
     return retval;
 }
 
-static int PA6H_set_sbas_enabled(void) {
+static int PA6H_set_sbas_enabled(const unsigned timeout_ms) {
     
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -258,41 +270,56 @@ static int PA6H_set_sbas_enabled(void) {
     else {
         const clock_t begin_time = clock();
 
-        printf("DEBUG SBAS ENABLED TX:  %s", tx_buf);
+        printf("TX SBAS ENABLED MSG:  %s", tx_buf);
 
         do {
             PA6H_write(tx_buf, strlen(tx_buf));
             PA6H_read(rx_buf, sizeof(rx_buf));
             if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                printf("DEBUG SBAS ENABLED RX:  %s\n", rx_buf);
+                printf("RX SBAS ENABLED MSG:  %s\n", rx_buf);
 
-        } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+            if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+                retval = ETIMEDOUT;
 
-        printf("DEBUG SBAS ENABLED:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+        } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+        if (!retval)
+            printf("SBAS ENABLED:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+        else
+            printf("SBAS ENABLED:  Timeout of %i milliseconds reached\n", timeout_ms);
     }
     
     return retval;
 }
 
-static void PA6H_query_sbas_enabled(void) {
+static int PA6H_query_sbas_enabled(const unsigned timeout_ms) {
 
+    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK413*34\r\n";
     char rx_buf[MAX_PACKET_BUF_SIZE];
     char reply_header[32] = "$PMTK513";
     const clock_t begin_time = clock();
 
-    printf("DEBUG QUERY SBAS ENABLED TX:  %s", tx_buf);
+    printf("TX QUERY SBAS ENABLED MSG:  %s", tx_buf);
 
     do {
         PA6H_write(tx_buf, strlen(tx_buf));
         PA6H_read(rx_buf, sizeof(rx_buf));
-    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+        if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+            retval = ETIMEDOUT;
 
-    printf("DEBUG QUERY SBAS ENABLED RX:  %s\n", rx_buf);
-    printf("DEBUG QUERY SBAS ENABLED:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    } while (!retval && strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("RX QUERY SBAS ENABLED MSG:  %s\n", rx_buf);
+    if (!retval)
+        printf("QUERY SBAS ENABLED:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    else
+        printf("QUERY SBAS ENABLED:  Timeout of %i milliseconds reached\n", timeout_ms);
+
+    return retval;
 }
 
-static int PA6H_set_dgps_mode(const PAH6_config config) {
+static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_ms) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -308,46 +335,61 @@ static int PA6H_set_dgps_mode(const PAH6_config config) {
         else {
             /* SBAS needs to be enabled when WAAS is used */
             if (config.dgps_mode == WAAS_DGPS)
-                PA6H_set_sbas_enabled();
+                PA6H_set_sbas_enabled(timeout_ms);
             
             const clock_t begin_time = clock();
             
-            printf("DEBUG SET DGPS MODE TX:  %s", tx_buf);
+            printf("TX SET DGPS MODE MSG:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
                 if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                    printf("DEBUG SET DGPS MODE RX:  %s\n", rx_buf);
+                    printf("RX SET DGPS MODE MSG:  %s\n", rx_buf);
 
-            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+                if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+                    retval = ETIMEDOUT;
 
-            printf("DEBUG SET DGPS MODE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            if (!retval)
+                printf("SET DGPS MODE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            else
+                printf("SET DGPS MODE:  Timeout of %i milliseconds reached\n", timeout_ms);
         }
     }
 
     return retval;
 }
 
-static void PA6H_query_dgps_mode(void) {
+static int PA6H_query_dgps_mode(const unsigned timeout_ms) {
 
+    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK401*37\r\n";
     char rx_buf[MAX_PACKET_BUF_SIZE];
     char reply_header[32] = "$PMTK501";
     const clock_t begin_time = clock();
 
-    printf("DEBUG QUERY SET DGPS MODE TX:  %s", tx_buf);
+    printf("TX QUERY SET DGPS MODE MSG:  %s", tx_buf);
 
     do {
         PA6H_write(tx_buf, strlen(tx_buf));
         PA6H_read(rx_buf, sizeof(rx_buf));
-    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+        if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+            retval = ETIMEDOUT;
 
-    printf("DEBUG QUERY SET DGPS MODE RX:  %s\n", rx_buf);
-    printf("DEBUG QUERY SET DGPS MODE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    } while (!retval && strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("RX QUERY SET DGPS MODE MSG:  %s\n", rx_buf);
+    if (!retval)
+        printf("QUERY SET DGPS MODE:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    else
+        printf("QUERY SET DGPS MODE:  Timeout of %i milliseconds reached\n", timeout_ms);
+
+    return retval;
 }
 
-static int PA6H_set_output(const PAH6_config config) {
+static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms) {
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
@@ -365,39 +407,54 @@ static int PA6H_set_output(const PAH6_config config) {
         else {
             const clock_t begin_time = clock();
 
-            printf("DEBUG SET OUTPUT TX:  %s", tx_buf);
+            printf("TX SET OUTPUT MSG:  %s", tx_buf);
 
             do {
                 PA6H_write(tx_buf, strlen(tx_buf));
                 PA6H_read(rx_buf, sizeof(rx_buf));
                 if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                    printf("DEBUG SET OUTPUT RX:  %s\n", rx_buf);
+                    printf("RX SET OUTPUT MSG:  %s\n", rx_buf);
 
-            } while (strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+                if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+                    retval = ETIMEDOUT;
 
-            printf("DEBUG SET OUTPUT:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+            if (!retval)
+                printf("SET OUTPUT:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+            else
+                printf("SET OUTPUT:  Timeout of %i milliseconds reached\n", timeout_ms);
         }
     }
 
     return retval;
 }
 
-static void PA6H_query_output(void) {
+static int PA6H_query_output(const unsigned timeout_ms) {
 
+    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK414*33\r\n";
     char rx_buf[MAX_PACKET_BUF_SIZE];
     char reply_header[32] = "$PMTK514";
     const clock_t begin_time = clock();
 
-    printf("DEBUG QUERY OUTPUT TX:  %s", tx_buf);
+    printf("TX QUERY OUTPUT MSG:  %s", tx_buf);
 
     do {
         PA6H_write(tx_buf, strlen(tx_buf));
         PA6H_read(rx_buf, sizeof(rx_buf));
-    } while (strncmp(rx_buf, reply_header, strlen(reply_header)));
+        if (timeout_ms && 1000*((clock()-begin_time)/CLOCKS_PER_SEC) >= timeout_ms)
+            retval = ETIMEDOUT;
 
-    printf("DEBUG QUERY OUTPUT RX:  %s\n", rx_buf);
-    printf("DEBUG QUERY OUTPUT:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    } while (!retval && strncmp(rx_buf, reply_header, strlen(reply_header)));
+
+    printf("RX QUERY OUTPUT MSG:  %s\n", rx_buf);
+    if (!retval)
+        printf("QUERY OUTPUT:  It took %0.6f milliseconds for an ACK\n", 1000*((float)clock() - begin_time)/CLOCKS_PER_SEC);
+    else
+        printf("QUERY OUTPUT:  Timeout of %i milliseconds reached\n", timeout_ms);
+
+    return retval;
 }
 
 static unsigned nema_checksum(const char *nema_packet) {
