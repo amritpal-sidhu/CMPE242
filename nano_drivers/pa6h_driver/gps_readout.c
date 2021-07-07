@@ -48,7 +48,7 @@ int main(void) {
         PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf));
         printf("%s\n", gps_data_buf);
         fflush(stdout);
-        sleep(1);
+        // sleep(1);
     }
 
     printf("\nClosing serial port and terminating program\n");
