@@ -27,12 +27,12 @@ int main(void) {
     gps_config.baud_rate = PA6H_BAUD_9600;
     gps_config.update_rate = 1000;
     gps_config.dgps_mode = WAAS_DGPS;
-    gps_config.sen_output_rates.gll = ONCE_EVERY_TWO_FIXES;
-    gps_config.sen_output_rates.rmc = ONCE_EVERY_FIVE_FIXES;
-    gps_config.sen_output_rates.vtg = ONCE_EVERY_FIVE_FIXES;
+    gps_config.sen_output_rates.gll = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.rmc = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.vtg = DISABLE_OUTPUT;
     gps_config.sen_output_rates.gga = ONCE_EVERY_FIX;
-    gps_config.sen_output_rates.gsa = ONCE_EVERY_THREE_FIXES;
-    gps_config.sen_output_rates.gsv = ONCE_EVERY_THREE_FIXES;
+    gps_config.sen_output_rates.gsa = DISABLE_OUTPUT;
+    gps_config.sen_output_rates.gsv = DISABLE_OUTPUT;
     gps_config.sen_output_rates.mchn = DISABLE_OUTPUT;
     gps_config.nav_speed_threshold = PA6H_NAV_SPEED_THRESH_DISABLE;
 
@@ -45,9 +45,8 @@ int main(void) {
 
     while (!stop_signal) {
 
-        PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf));
-        printf("%s\n", gps_data_buf);
-        fflush(stdout);
+        if (PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf)) != -1)
+            printf("%s\n", gps_data_buf);
         sleep(1);
     }
 

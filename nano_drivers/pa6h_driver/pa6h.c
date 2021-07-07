@@ -6,6 +6,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 #define MAX_PACKET_BUF_SIZE     256
@@ -34,7 +35,7 @@ static int PA6H_query_dgps_mode(const unsigned timeout_ms);
 static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms);
 static int PA6H_query_output(const unsigned timeout_ms);
 
-static unsigned nema_checksum(const char *nema_packet);
+static int nema_checksum(const char *nema_packet);
 
 
 int PA6H_jetson_nano_init(const PAH6_config config_data) {
@@ -102,11 +103,21 @@ void PA6H_jetson_nano_deinit(void) {
     close(uart_fd);
 }
 
-void PA6H_read_GP_sentence(char *buf, const int buf_size) {
+int PA6H_read_GP_sentence(char *buf, const int buf_size) {
 
+    int checksum = 0;
     char GP_header[8] = "$GP";
 
     while (PA6H_read_sentence(buf, buf_size) && strncmp(buf, GP_header, strlen(GP_header)));
+    if ((checksum=nema_checksum(buf)) != -1) {
+        char rx_checksum[3];
+        strncpy(rx_checksum, strchr(buf, '*')+1, 2*sizeof(char));
+        rx_checksum[2] = '\0';
+        if (checksum != strtol(rx_checksum, NULL, 16))
+            checksum = -1;
+    }
+
+    return checksum;
 }
 
 /**
@@ -467,20 +478,24 @@ static int PA6H_query_output(const unsigned timeout_ms) {
     return retval;
 }
 
-static unsigned nema_checksum(const char *nema_packet) {
+static int nema_checksum(const char *nema_packet) {
 
-    unsigned checksum = 0;
-    int i = 0;
+    int checksum = 0;
+    size_t i = 0;
 
     if (nema_packet[i] == '$') {
         
         while (nema_packet[++i] != '*') {
-            // if (i > strlen(nema_packet)-5) {
-            //     checksum = 0;
-            //     break;
-            // }
+            /* check if packet possibly corrupt */
+            if (i > strlen(nema_packet)-5) {
+                checksum = -1;
+                break;
+            }
             checksum ^= nema_packet[i];
         }
+    }
+    else {
+        checksum = -1;
     }
 
     return checksum;
