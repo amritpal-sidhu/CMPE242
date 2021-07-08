@@ -1,13 +1,14 @@
 #include "pa6h.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include <errno.h>
 #include <fcntl.h> 
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 
 #define MAX_PACKET_BUF_SIZE     256
 
@@ -36,6 +37,8 @@ static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms);
 static int PA6H_query_output(const unsigned timeout_ms);
 
 static int nema_checksum(const char *nema_packet);
+
+static float coordinate_strtof(const char *str);
 
 
 int PA6H_jetson_nano_init(const PAH6_config config_data) {
@@ -118,6 +121,48 @@ int PA6H_read_GP_sentence(char *buf, const int buf_size) {
     }
 
     return checksum;
+}
+
+int PA6H_parse_coordinate(char *GP_sentence, PAH6_gps_coordinate *result_coordinate) {
+
+    int retval = 0;
+    char *delim_ptr;
+
+    delim_ptr = strtok(GP_sentence, ",");
+
+    if (!strcmp(delim_ptr, "$GPGLL")) {
+        
+        delim_ptr = strtok(NULL, ",");
+    }
+    else if (!strcmp(delim_ptr, "$GPGGA")) {
+
+        for (size_t i = 0; i < 2; ++i)
+            delim_ptr = strtok(NULL, ",");
+    }
+    else if (!strcmp(delim_ptr, "$GPRMC")) {
+
+        for (size_t i = 0; i < 3; ++i)
+            delim_ptr = strtok(NULL, ",");
+    }
+    else {
+        retval = -1;
+    }
+
+    if (!retval) {
+
+        result_coordinate->latitude = coordinate_strtof(delim_ptr);
+        delim_ptr = strtok(NULL, ",");
+        if (!strcmp(delim_ptr, "S"))
+            result_coordinate->latitude *= -1;
+        
+        delim_ptr = strtok(NULL, ",");
+        result_coordinate->longitude = coordinate_strtof(delim_ptr);
+        delim_ptr = strtok(NULL, ",");
+        if (!strcmp(delim_ptr, "W"))
+            result_coordinate->longitude *= -1;
+    }
+
+    return retval;
 }
 
 /**
@@ -499,4 +544,18 @@ static int nema_checksum(const char *nema_packet) {
     }
 
     return checksum;
+}
+
+static float coordinate_strtof(const char *str) {
+
+    /* TODO: add error checking */
+    float coordinate;
+    char *ptr = strchr(str, '.')-2; // points to start of degree portion
+
+    coordinate = strtof(ptr, NULL)/60;
+    *ptr = '\0';
+    coordinate += strtof(str, NULL);
+    *ptr = '0'; // remove NULL char
+
+    return coordinate;
 }

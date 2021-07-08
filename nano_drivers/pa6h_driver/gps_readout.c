@@ -23,6 +23,7 @@ int main(void) {
 
     char gps_data_buf[200];
     PAH6_config gps_config;
+    PAH6_gps_coordinate coord;
 
     gps_config.baud_rate = PA6H_BAUD_9600;
     gps_config.update_rate = 1000;
@@ -45,8 +46,12 @@ int main(void) {
 
     while (!stop_signal) {
 
-        if (PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf)) != -1)
+        if (PA6H_read_GP_sentence(gps_data_buf, sizeof(gps_data_buf)) != -1) {
             printf("%s\n", gps_data_buf);
+            if (PA6H_parse_coordinate(gps_data_buf, &coord) != -1) {
+                printf("\tlat, long = %f, %f\n", coord.latitude, coord.longitude);
+            }
+        }
         sleep(1);
     }
 

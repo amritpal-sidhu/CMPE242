@@ -41,6 +41,11 @@ typedef struct {
     unsigned nav_speed_threshold;   /* See below for nav speed thresholds */
 } PAH6_config;
 
+typedef struct {
+    float latitude;
+    float longitude;
+} PAH6_gps_coordinate;
+
 /**
  * Jetson nano UART2 on J41 pin header:
  *   UART_2_TX - pin 8  - P
@@ -80,3 +85,5 @@ int PA6H_jetson_nano_init(const PAH6_config config_data);
 void PA6H_jetson_nano_deinit(void);
 
 int PA6H_read_GP_sentence(char *buf, const int buf_size);
+
+int PA6H_parse_coordinate(char *GP_sentence, PAH6_gps_coordinate *result_coordinate);
