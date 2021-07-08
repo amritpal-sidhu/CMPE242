@@ -91,14 +91,14 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
         }
     }
 
-    // PA6H_query_sbas_enabled(1000);
-    // PA6H_query_dgps_mode(1000);
-    // PA6H_query_output(1000);
+    // PA6H_query_sbas_enabled(5000);
+    // PA6H_query_dgps_mode(5000);
+    // PA6H_query_output(5000);
 
-    // PA6H_set_baudrate(config_data, 1000);
-    PA6H_set_updaterate(config_data, 1000);
-    PA6H_set_dgps_mode(config_data, 1000);
-    PA6H_set_output(config_data, 1000);
+    // PA6H_set_baudrate(config_data, 5000);
+    PA6H_set_updaterate(config_data, 5000);
+    PA6H_set_dgps_mode(config_data, 5000);
+    PA6H_set_output(config_data, 5000);
 
     return retval;
 }
