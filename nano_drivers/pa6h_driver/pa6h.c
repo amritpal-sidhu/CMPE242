@@ -10,7 +10,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define MAX_PACKET_BUF_SIZE     256
+#define MAX_PACKET_BUF_SIZE     128
 
 
 static int uart_fd = -1;
@@ -280,14 +280,39 @@ static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
     char ack_msg[32] = "$PMTK001,220,3";
+    const clock_t begin_tick = clock();
+    const clock_t end_tick = (((float)timeout_ms/1000)*CLOCKS_PER_SEC) + begin_tick;
 
     if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK220,%i*", config.update_rate) < 0
         || snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0) {
         retval = -1;
     }
     else {
-        retval = PA6H_config_wrapper("SET UPDATERATE", tx_buf, ack_msg, timeout_ms);
+        printf("TX %s MSG:  %s", "SET UPDATERATE", tx_buf);
+
+        PA6H_write_sentence(tx_buf, strlen(tx_buf));
+        linux_uart_set_baud(config.update_rate);
+
+        do {
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
+            if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                printf("RX %s MSG:  %s\n", "SET UPDATERATE", rx_buf);
+
+            if (timeout_ms && clock() >= end_tick)
+                retval = ETIMEDOUT;
+
+        } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+        if (!retval) {
+            printf("%s:  It took %0.6f milliseconds for an ACK\n", "SET UPDATERATE", 1000*(((float)clock()-begin_tick)/CLOCKS_PER_SEC));
+            previous_baud_rate = config.update_rate;
+        }
+        else {
+            printf("%s:  Timeout of %i milliseconds reached\n", "SET UPDATERATE", timeout_ms);
+            linux_uart_set_baud(previous_baud_rate);
+        }
     }
 
     return retval;

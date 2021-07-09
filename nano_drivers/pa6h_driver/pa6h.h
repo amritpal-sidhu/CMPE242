@@ -86,4 +86,8 @@ void PA6H_jetson_nano_deinit(void);
 
 int PA6H_read_GP_sentence(char *buf, const int buf_size);
 
+/**
+ * @note This function uses strtok and will thus insert null characters in the
+ *       GP_sentence buffer.
+ */
 int PA6H_parse_coordinate(char *GP_sentence, PAH6_gps_coordinate *result_coordinate);
