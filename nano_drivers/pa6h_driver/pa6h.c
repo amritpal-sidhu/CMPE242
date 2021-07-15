@@ -46,7 +46,7 @@ static float coordinate_strtof(const char *str);
 int PA6H_jetson_nano_init(const PAH6_config config_data) {
 
     struct termios tty;
-    int retval;
+    int retval = 0;
 
     if ((uart_fd = open(JETSON_NANO_LINUX_UART, O_RDWR)) < 0) {
         printf("Error %i from open: %s\n", errno, strerror(errno));
@@ -176,10 +176,10 @@ int PA6H_parse_coordinate(char *GP_sentence, PAH6_gps_coordinate *result_coordin
 static int linux_uart_set_baud(const unsigned baud_rate) {
 
     struct termios tty;
-    int retval;
+    int retval = 0;
 
     if (tcgetattr(uart_fd, &tty) != 0) {
-        printf("tcgetattr failed when linux_uart_set_baud() called\n");
+        printf("tcgetattr failed when linux_uart_set_baud() called with uart_fd = %i\n", uart_fd);
         retval = -1;
     }
     else {
@@ -276,7 +276,7 @@ static int PA6H_config_wrapper(const char *config_cmd_name, const char *pmtk_sen
     int retval = 0;
     char rx_buf[MAX_PACKET_BUF_SIZE];
     const clock_t begin_tick = clock();
-    const clock_t end_tick = (((float)timeout_ms/1000)*CLOCKS_PER_SEC) + begin_tick;
+    const clock_t end_tick = (timeout_ms*CLOCKS_PER_SEC)/1000 + begin_tick;
 
     printf("TX %s MSG:  %s", config_cmd_name, pmtk_sen);
 
@@ -323,7 +323,7 @@ static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms
     char rx_buf[MAX_PACKET_BUF_SIZE];
     char ack_msg[32] = "$PMTK001,251,3";
     const clock_t begin_tick = clock();
-    const clock_t end_tick = (((float)timeout_ms/1000)*CLOCKS_PER_SEC) + begin_tick;
+    const clock_t end_tick = (timeout_ms*CLOCKS_PER_SEC)/1000 + begin_tick;
 
     if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK251,%i*", config.baud_rate) < 0
         || snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0) {
@@ -333,7 +333,8 @@ static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms
         printf("TX %s MSG:  %s", "SET BAUDRATE", tx_buf);
 
         PA6H_write_sentence(tx_buf, strlen(tx_buf));
-        linux_uart_set_baud(config.update_rate);
+        if (linux_uart_set_baud(config.update_rate) != -1)
+            printf("SET BAUDRATE:  linux baudrate updated\n");
 
         do {
             PA6H_read_sentence(rx_buf, sizeof(rx_buf));
