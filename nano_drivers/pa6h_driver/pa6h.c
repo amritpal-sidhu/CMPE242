@@ -88,17 +88,19 @@ int PA6H_jetson_nano_init(const PAH6_config config_data) {
                 printf("tcsetattr failed\n");
                 retval = -1;
             }
+            else {
+
+                // PA6H_query_sbas_enabled(5000);
+                // PA6H_query_dgps_mode(5000);
+                // PA6H_query_output(5000);
+
+                PA6H_set_baudrate(config_data, 5000);
+                PA6H_set_updaterate(config_data, 5000);
+                PA6H_set_dgps_mode(config_data, 5000);
+                PA6H_set_output(config_data, 5000);
+            }
         }
     }
-
-    // PA6H_query_sbas_enabled(5000);
-    // PA6H_query_dgps_mode(5000);
-    // PA6H_query_output(5000);
-
-    // PA6H_set_baudrate(config_data, 5000);
-    PA6H_set_updaterate(config_data, 5000);
-    PA6H_set_dgps_mode(config_data, 5000);
-    PA6H_set_output(config_data, 5000);
 
     return retval;
 }
@@ -110,7 +112,7 @@ void PA6H_jetson_nano_deinit(void) {
 
 int PA6H_read_GP_sentence(char *buf, const int buf_size) {
 
-    int checksum = 0;
+    int checksum = -1;
     char GP_header[8] = "$GP";
 
     while (PA6H_read_sentence(buf, buf_size) && strncmp(buf, GP_header, strlen(GP_header)));
@@ -181,6 +183,27 @@ static int linux_uart_set_baud(const unsigned baud_rate) {
         retval = -1;
     }
     else {
+        tty.c_cflag &= ~PARENB;
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CSIZE;
+        tty.c_cflag |= CS8;
+        tty.c_cflag &= ~CRTSCTS;
+        tty.c_cflag |= CREAD | CLOCAL;
+
+        tty.c_lflag &= ~ICANON;
+        tty.c_lflag &= ~ECHO;
+        tty.c_lflag &= ~ECHOE;
+        tty.c_lflag &= ~ECHONL;
+        tty.c_lflag &= ~ISIG;
+
+        tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+        tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
+        
+        tty.c_oflag &= ~OPOST;
+        tty.c_oflag &= ~ONLCR;
+
+        tty.c_cc[VMIN] = 0;
+        tty.c_cc[VTIME] = 0;
         
         switch (baud_rate)
         {
@@ -269,7 +292,7 @@ static int PA6H_config_wrapper(const char *config_cmd_name, const char *pmtk_sen
     } while (!retval && strncmp(rx_buf, ack_sen, strlen(ack_sen)));
 
     if (!retval)
-        printf("%s:  It took %0.6f milliseconds for an ACK\n", config_cmd_name, 1000*(((float)clock()-begin_tick)/CLOCKS_PER_SEC));
+        printf("%s:  It took %0.3f milliseconds for an ACK\n", config_cmd_name, 1000*(((float)clock()-begin_tick)/CLOCKS_PER_SEC));
     else
         printf("%s:  Timeout of %i milliseconds reached\n", config_cmd_name, timeout_ms);
 
@@ -280,39 +303,14 @@ static int PA6H_set_updaterate(const PAH6_config config, const unsigned timeout_
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
-    char rx_buf[MAX_PACKET_BUF_SIZE];
     char ack_msg[32] = "$PMTK001,220,3";
-    const clock_t begin_tick = clock();
-    const clock_t end_tick = (((float)timeout_ms/1000)*CLOCKS_PER_SEC) + begin_tick;
 
     if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK220,%i*", config.update_rate) < 0
         || snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0) {
         retval = -1;
     }
     else {
-        printf("TX %s MSG:  %s", "SET UPDATERATE", tx_buf);
-
-        PA6H_write_sentence(tx_buf, strlen(tx_buf));
-        linux_uart_set_baud(config.update_rate);
-
-        do {
-            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
-            if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
-                printf("RX %s MSG:  %s\n", "SET UPDATERATE", rx_buf);
-
-            if (timeout_ms && clock() >= end_tick)
-                retval = ETIMEDOUT;
-
-        } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
-
-        if (!retval) {
-            printf("%s:  It took %0.6f milliseconds for an ACK\n", "SET UPDATERATE", 1000*(((float)clock()-begin_tick)/CLOCKS_PER_SEC));
-            previous_baud_rate = config.update_rate;
-        }
-        else {
-            printf("%s:  Timeout of %i milliseconds reached\n", "SET UPDATERATE", timeout_ms);
-            linux_uart_set_baud(previous_baud_rate);
-        }
+        retval = PA6H_config_wrapper("SET UPDATERATE", tx_buf, ack_msg, timeout_ms);
     }
 
     return retval;
@@ -322,14 +320,39 @@ static int PA6H_set_baudrate(const PAH6_config config, const unsigned timeout_ms
 
     int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE];
+    char rx_buf[MAX_PACKET_BUF_SIZE];
     char ack_msg[32] = "$PMTK001,251,3";
+    const clock_t begin_tick = clock();
+    const clock_t end_tick = (((float)timeout_ms/1000)*CLOCKS_PER_SEC) + begin_tick;
 
     if (snprintf(tx_buf, MAX_PACKET_BUF_SIZE, "$PMTK251,%i*", config.baud_rate) < 0
         || snprintf(tx_buf+strlen(tx_buf), MAX_PACKET_BUF_SIZE, "%02X\r\n", nema_checksum(tx_buf)) < 0) {
         retval = -1;
     }
     else {
-        retval = PA6H_config_wrapper("SET BAUDRATE", tx_buf, ack_msg, timeout_ms);
+        printf("TX %s MSG:  %s", "SET BAUDRATE", tx_buf);
+
+        PA6H_write_sentence(tx_buf, strlen(tx_buf));
+        linux_uart_set_baud(config.update_rate);
+
+        do {
+            PA6H_read_sentence(rx_buf, sizeof(rx_buf));
+            if (!strncmp(rx_buf, ack_msg, strlen(ack_msg)-2))
+                printf("RX %s MSG:  %s\n", "SET BAUDRATE", rx_buf);
+
+            if (timeout_ms && clock() >= end_tick)
+                retval = ETIMEDOUT;
+
+        } while (!retval && strncmp(rx_buf, ack_msg, strlen(ack_msg)));
+
+        if (!retval) {
+            printf("%s:  It took %0.6f milliseconds for an ACK\n", "SET BAUDRATE", 1000*(((float)clock()-begin_tick)/CLOCKS_PER_SEC));
+            previous_baud_rate = config.update_rate;
+        }
+        else {
+            printf("%s:  Timeout of %i milliseconds reached\n", "SET BAUDRATE", timeout_ms);
+            linux_uart_set_baud(previous_baud_rate);
+        }
     }
 
     return retval;
@@ -352,13 +375,10 @@ static int PA6H_set_sbas_enabled(const unsigned timeout_ms) {
 
 static int PA6H_query_sbas_enabled(const unsigned timeout_ms) {
 
-    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK413*34\r\n";
     char reply_header[32] = "$PMTK513";
     
-    retval = PA6H_config_wrapper("QUERY SBAS", tx_buf, reply_header, timeout_ms);
-
-    return retval;
+    return PA6H_config_wrapper("QUERY SBAS", tx_buf, reply_header, timeout_ms);
 }
 
 static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_ms) {
@@ -374,9 +394,10 @@ static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_m
     else {
         /* SBAS needs to be enabled when WAAS is used */
         if (config.dgps_mode == WAAS_DGPS)
-            PA6H_set_sbas_enabled(timeout_ms);
+            retval = PA6H_set_sbas_enabled(timeout_ms);
         
-        retval = PA6H_config_wrapper("SET DGPS MODE", tx_buf, ack_msg, timeout_ms);
+        if (!retval)
+            retval = PA6H_config_wrapper("SET DGPS MODE", tx_buf, ack_msg, timeout_ms);
     }
 
     return retval;
@@ -384,13 +405,10 @@ static int PA6H_set_dgps_mode(const PAH6_config config, const unsigned timeout_m
 
 static int PA6H_query_dgps_mode(const unsigned timeout_ms) {
 
-    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK401*37\r\n";
     char reply_header[32] = "$PMTK501";
     
-    retval = PA6H_config_wrapper("QUERY DGPS MODE", tx_buf, reply_header, timeout_ms);
-
-    return retval;
+    return PA6H_config_wrapper("QUERY DGPS MODE", tx_buf, reply_header, timeout_ms);
 }
 
 static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms) {
@@ -414,13 +432,10 @@ static int PA6H_set_output(const PAH6_config config, const unsigned timeout_ms) 
 
 static int PA6H_query_output(const unsigned timeout_ms) {
 
-    int retval = 0;
     char tx_buf[MAX_PACKET_BUF_SIZE] = "$PMTK414*33\r\n";
     char reply_header[32] = "$PMTK514";
     
-    retval = PA6H_config_wrapper("QUERY OUTPUT", tx_buf, reply_header, timeout_ms);
-
-    return retval;
+    return PA6H_config_wrapper("QUERY OUTPUT", tx_buf, reply_header, timeout_ms);
 }
 
 static int nema_checksum(const char *nema_packet) {
@@ -428,9 +443,9 @@ static int nema_checksum(const char *nema_packet) {
     int checksum = 0;
     size_t i = 0;
 
-    if (nema_packet[i] == '$') {
+    if (nema_packet && nema_packet[i] == '$') {
         
-        while (nema_packet[++i] != '*') {
+        while (&nema_packet[++i] && nema_packet[i] != '*') {
             /* check if packet possibly corrupt */
             if (i > strlen(nema_packet)-1) {
                 checksum = -1;
@@ -448,15 +463,18 @@ static int nema_checksum(const char *nema_packet) {
 
 static float coordinate_strtof(const char *str) {
 
-    /* TODO: add error checking */
     float coordinate;
-    char *ptr = strchr(str, '.')-2; // points to start of degree portion
-    char previous_value = *ptr;
 
-    coordinate = strtof(ptr, NULL)/60;
-    *ptr = '\0';
-    coordinate += strtof(str, NULL);
-    *ptr = previous_value;
+    if (str) {
+
+        char *ptr = strchr(str, '.')-2; // points to start of degree portion
+        char previous_value = *ptr;
+
+        coordinate = strtof(ptr, NULL)/60;
+        *ptr = '\0';
+        coordinate += strtof(str, NULL);
+        *ptr = previous_value;
+    }
 
     return coordinate;
 }
